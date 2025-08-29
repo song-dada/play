@@ -2,8 +2,9 @@
 <html lang="ko">
 
 <head>
-    <meta charset="UTF-8">
-    <title>랜덤 미로 게임 (스크롤 방식)</title>
+    <meta charset="UTF-8" />
+    <title>랜덤 미로 게임 (벽 이미지 + 회전 덧그리기)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
         :root {
             color-scheme: light dark;
@@ -13,10 +14,11 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            background: #eee;
-            font-family: system-ui, -apple-system, sans-serif;
+            gap: 14px;
             margin: 0;
             padding: 24px;
+            background: #eee;
+            font-family: system-ui, -apple-system, sans-serif;
         }
 
         #gameWrapper {
@@ -40,11 +42,9 @@
             border: 2px solid #333;
             background: #111;
             box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
-            margin-top: 12px;
         }
 
         .hud {
-            margin: 6px 0 0;
             font-size: 14px;
             color: #333;
         }
@@ -52,15 +52,14 @@
         #overlay {
             position: fixed;
             inset: 0;
-            display: flex;
+            display: none;
             align-items: center;
             justify-content: center;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            font-size: 24px;
+            background: rgba(0, 0, 0, .7);
+            color: #fff;
             font-weight: bold;
+            font-size: 24px;
             z-index: 999;
-            display: none;
         }
 
         #joystick {
@@ -70,7 +69,7 @@
             width: 120px;
             height: 120px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, .1);
             border: 2px solid #666;
             touch-action: none;
             z-index: 1000;
@@ -80,7 +79,7 @@
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            background: rgba(255, 0, 0, 0.6);
+            background: rgba(255, 0, 0, .6);
             position: absolute;
             left: 50%;
             top: 50%;
@@ -90,9 +89,8 @@
 </head>
 
 <body>
-
     <div id="gameWrapper">
-        <canvas id="game" width="480" height="480"></canvas>
+        <canvas id="game" width="480" height="480" aria-label="게임 화면"></canvas>
     </div>
     <canvas id="miniMap" width="260" height="260" aria-label="미니맵"></canvas>
     <div class="hud" id="hud"></div>
@@ -111,7 +109,7 @@
         const joystick = document.getElementById("joystick");
         const stick = document.getElementById("stick");
 
-        // 상태
+        // ===== 상태 =====
         let rows, cols, tileSize = 30;
         let revealRadius;
         let maze, revealed, player, goal, items;
@@ -123,6 +121,7 @@
 
         function inBounds(x, y) { return x >= 0 && y >= 0 && x < cols && y < rows; }
 
+        // ===== 미로 생성 (DFS) =====
         function generateMaze(w, h) {
             const mz = Array.from({ length: h }, () => Array(w).fill(1));
             function carve(x, y) {
@@ -165,7 +164,8 @@
                     if (inBounds(nx, ny) && maze[ny][nx] === 0 && dist[ny][nx] === -1) {
                         dist[ny][nx] = dist[y][x] + 1;
                         q.push({ x: nx, y: ny });
-                        if ((nx === 0 || ny === 0 || nx === w - 1 || ny === h - 1) && dist[ny][nx] > dist[best.y][best.x]) best = { x: nx, y: ny };
+                        const isBorder = (nx === 0 || ny === 0 || nx === w - 1 || ny === h - 1);
+                        if (isBorder && dist[ny][nx] > dist[best.y][best.x]) best = { x: nx, y: ny };
                     }
                 }
             }
@@ -174,12 +174,12 @@
 
         function placeItems() {
             const candidates = [];
-            for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+            for (let y = 0; y < rows; y++)for (let x = 0; x < cols; x++) {
                 if (maze[y][x] === 0 && !(x === Math.floor(player.x) && y === Math.floor(player.y)) && !(x === goal.x && y === goal.y))
                     candidates.push({ x, y });
             }
             items = [];
-            const types = ["key", "gem"];
+            const types = ["key", "gem", "compass"]; // compass는 선택 아이템
             for (const type of types) {
                 if (!candidates.length) break;
                 const idx = Math.floor(Math.random() * candidates.length);
@@ -202,7 +202,7 @@
             rows = 21 + (level - 1) * 2;
             cols = 21 + (level - 1) * 2;
             if (rows % 2 === 0) rows++; if (cols % 2 === 0) cols++;
-            revealRadius = 3 - Math.min(level - 1, 3);
+            revealRadius = 3 - Math.min(level - 1, 3); // 미니맵 밝히기 범위
 
             maze = generateMaze(cols, rows);
             const [topEntrance] = openEntrances(maze);
@@ -218,66 +218,197 @@
         function updateHud() {
             const needKey = collected.has("key") ? "🔑획득" : "🔑없음";
             const needGem = collected.has("gem") ? "💎획득" : "💎없음";
-            hud.textContent = `레벨 ${level} / 아이템: ${needKey} / ${needGem}`;
+            const optionalCompass = collected.has("compass") ? "🧭획득" : "🧭없음";
+            hud.textContent = `레벨 ${level} / 아이템: ${needKey} / ${needGem} / ${optionalCompass}`;
         }
 
-        // 충돌 검사 (AABB)
+        // ===== 충돌 (AABB) =====
         function canMoveTo(cx, cy) {
             const half = player.size / 2, eps = 1e-8;
             const minX = Math.floor(cx - half + eps), maxX = Math.floor(cx + half - eps);
             const minY = Math.floor(cy - half + eps), maxY = Math.floor(cy + half - eps);
-            for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++)
+            for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
                 if (!inBounds(x, y) || maze[y][x] === 1) return false;
+            }
             return true;
         }
 
         function updatePlayer() {
-            const nx = player.x + velocity.x * speed, ny = player.y + velocity.y * speed;
+            const nx = player.x + velocity.x * speed;
+            const ny = player.y + velocity.y * speed;
+
             if (canMoveTo(nx, ny)) { player.x = nx; player.y = ny; }
-            else { if (canMoveTo(nx, player.y)) player.x = nx; if (canMoveTo(player.x, ny)) player.y = ny; }
+            else {
+                if (canMoveTo(nx, player.y)) player.x = nx;
+                if (canMoveTo(player.x, ny)) player.y = ny;
+            }
+
             revealAround(Math.floor(player.x), Math.floor(player.y));
+
             for (let i = items.length - 1; i >= 0; i--) {
                 if (Math.hypot(items[i].x + 0.5 - player.x, items[i].y + 0.5 - player.y) < 0.6) {
-                    collected.add(items[i].type); items.splice(i, 1); updateHud();
+                    collected.add(items[i].type);
+                    items.splice(i, 1);
+                    updateHud();
                 }
             }
+
             if (Math.hypot(goal.x + 0.5 - player.x, goal.y + 0.5 - player.y) < 0.6) {
-                if (collected.has("key") && collected.has("gem")) showStory();
-                else { overlay.textContent = "아이템이 부족합니다! 🔑와 💎를 모두 모으세요."; overlay.style.display = "flex"; setTimeout(() => overlay.style.display = "none", 1500); }
+                if (collected.has("key") && collected.has("gem")) {
+                    showStory();
+                } else {
+                    alert("아이템이 부족합니다! 🔑와 💎를 모두 모으세요.");
+                }
             }
         }
 
+        // ===== 벽 이미지 리소스 (회전용) =====
+        const wallImages = {
+            horizontal: new Image(),
+            vertical: new Image(),
+            corner: new Image(),
+            T: new Image(),
+            cross: new Image(),
+            end: new Image(),
+            solid: new Image() // 폴백
+        };
+        // 경로는 원하는 파일명으로 교체
+        wallImages.horizontal.src = "img/wall_horizontal.png";
+        wallImages.vertical.src = "img/wall_vertical.png";
+        wallImages.corner.src = "img/wall_corner.png";
+        wallImages.T.src = "img/wall_T.png";
+        wallImages.cross.src = "img/wall_cross.png";
+        wallImages.end.src = "img/wall_end.png";
+        wallImages.solid.src = "img/wall_solid.png";
+
+        // 이 이미지가 로드됐는지 체크
+        function ready(img) { return img && img.complete && img.naturalWidth > 0; }
+
+        // 이웃 벽을 보고 타입 + 각도(라디안) 판별
+        function getWallInfo(x, y) {
+            if (maze[y][x] !== 1) return null;
+            const up = (y > 0 && maze[y - 1][x] === 1);
+            const down = (y < rows - 1 && maze[y + 1][x] === 1);
+            const left = (x > 0 && maze[y][x - 1] === 1);
+            const right = (x < cols - 1 && maze[y][x + 1] === 1);
+            const cnt = (up ? 1 : 0) + (down ? 1 : 0) + (left ? 1 : 0) + (right ? 1 : 0);
+
+            // 교차
+            if (cnt === 4) return { type: "cross", angle: 0 };
+
+            // 일자
+            if (cnt === 2 && left && right) return { type: "horizontal", angle: 0 };
+            if (cnt === 2 && up && down) return { type: "vertical", angle: 0 };
+
+            // 코너 (두 방향이 만나는 경우)
+            if (cnt === 2) {
+                // up+right (└ 모양을 90도 회전한 형태)
+                if (up && right) return { type: "corner", angle: 0 };
+                // right+down
+                if (right && down) return { type: "corner", angle: Math.PI / 2 };
+                // down+left
+                if (down && left) return { type: "corner", angle: Math.PI };
+                // left+up
+                if (left && up) return { type: "corner", angle: Math.PI * 3 / 2 };
+            }
+
+            // T자 (한 방향만 비어 있음)
+            if (cnt === 3) {
+                // 위가 비어 있으면 T가 위를 향함 (T의 머리가 위)
+                if (!up) return { type: "T", angle: 0 };
+                if (!right) return { type: "T", angle: Math.PI / 2 };
+                if (!down) return { type: "T", angle: Math.PI };
+                if (!left) return { type: "T", angle: Math.PI * 3 / 2 };
+            }
+
+            // 끝(막다른) — 연결된 한 방향 기준으로 방향 결정
+            if (cnt === 1) {
+                if (up) return { type: "end", angle: Math.PI };
+                if (right) return { type: "end", angle: Math.PI * 3 / 2 };
+                if (down) return { type: "end", angle: 0 };
+                if (left) return { type: "end", angle: Math.PI / 2 };
+            }
+
+            // 주변이 전부 빈 경우(외곽 단독 타일 등)
+            return { type: "solid", angle: 0 };
+        }
+
+        // 회전 그리기 유틸
+        function drawRotated(img, x, y, size, angle) {
+            gameCtx.save();
+            gameCtx.translate(x + size / 2, y + size / 2);
+            gameCtx.rotate(angle);
+            gameCtx.drawImage(img, -size / 2, -size / 2, size, size);
+            gameCtx.restore();
+        }
+
+        // ===== 그리기 =====
         function draw() {
             gameCtx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+
             const offsetX = Math.floor(player.x * tileSize - gameCanvas.width / 2);
             const offsetY = Math.floor(player.y * tileSize - gameCanvas.height / 2);
 
+            // 바닥/벽 기본 표현 먼저
             for (let y = 0; y < rows; y++) {
                 for (let x = 0; x < cols; x++) {
                     const screenX = x * tileSize - offsetX;
                     const screenY = y * tileSize - offsetY;
-                    if (screenX + tileSize < 0 || screenX > gameCanvas.width || screenY + tileSize < 0 || screenY > gameCanvas.height) continue;
-                    // gameCtx.fillStyle = revealed[y][x] ? (maze[y][x] === 1 ? "black" : "white") : "#333";
-                    gameCtx.fillStyle = maze[y][x] === 1 ? "black" : "white";
+                    if (screenX + tileSize < 0 || screenX > gameCanvas.width ||
+                        screenY + tileSize < 0 || screenY > gameCanvas.height) continue;
 
-                    gameCtx.fillRect(screenX, screenY, tileSize, tileSize);
-
-                    if (x === goal.x && y === goal.y && revealed[y][x]) {
-                        gameCtx.fillStyle = "green";
+                    if (maze[y][x] === 1) {
+                        gameCtx.fillStyle = "black";
                         gameCtx.fillRect(screenX, screenY, tileSize, tileSize);
-                    }
-                    for (const item of items) {
-                        if (item.x === x && item.y === y) {
-                            gameCtx.fillStyle = item.type === "key" ? "gold" : "dodgerblue";
-                            gameCtx.beginPath();
-                            gameCtx.arc(screenX + tileSize / 2, screenY + tileSize / 2, tileSize / 3, 0, Math.PI * 2);
-                            gameCtx.fill();
-                        }
+                    } else {
+                        gameCtx.fillStyle = "white";
+                        gameCtx.fillRect(screenX, screenY, tileSize, tileSize);
                     }
                 }
             }
 
-            // 플레이어 중앙
+            // 벽 이미지 덧그리기 (타입 + 각도)
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    if (maze[y][x] !== 1) continue;
+                    const info = getWallInfo(x, y);
+                    if (!info) continue;
+
+                    const img = wallImages[info.type] || wallImages.solid;
+                    if (!ready(img)) continue; // 로드 전이면 스킵(검은 벽만 보이게)
+
+                    const screenX = x * tileSize - offsetX;
+                    const screenY = y * tileSize - offsetY;
+                    if (screenX + tileSize < 0 || screenX > gameCanvas.width ||
+                        screenY + tileSize < 0 || screenY > gameCanvas.height) continue;
+
+                    drawRotated(img, screenX, screenY, tileSize, info.angle);
+                }
+            }
+
+            // 목표 (출구) — 미니맵에서만 밝혀졌을 때 초록으로 보이던 기존 동작을 유지할 수도 있지만
+            // 메인 화면은 시야제한을 적용하지 않으므로 항상 보이게 유지
+            const gx = goal.x * tileSize - offsetX;
+            const gy = goal.y * tileSize - offsetY;
+            if (gx + tileSize >= 0 && gx <= gameCanvas.width && gy + tileSize >= 0 && gy <= gameCanvas.height) {
+                gameCtx.fillStyle = "green";
+                gameCtx.fillRect(gx, gy, tileSize, tileSize);
+            }
+
+            // 아이템
+            for (const item of items) {
+                const sx = item.x * tileSize - offsetX;
+                const sy = item.y * tileSize - offsetY;
+                if (sx + tileSize < 0 || sx > gameCanvas.width || sy + tileSize < 0 || sy > gameCanvas.height) continue;
+                if (item.type === "key") gameCtx.fillStyle = "gold";
+                else if (item.type === "gem") gameCtx.fillStyle = "dodgerblue";
+                else if (item.type === "compass") gameCtx.fillStyle = "purple";
+                gameCtx.beginPath();
+                gameCtx.arc(sx + tileSize / 2, sy + tileSize / 2, tileSize / 3, 0, Math.PI * 2);
+                gameCtx.fill();
+            }
+
+            // 플레이어(화면 중앙 고정)
             const psizePx = tileSize * player.size;
             const px = gameCanvas.width / 2 - psizePx / 2;
             const py = gameCanvas.height / 2 - psizePx / 2;
@@ -285,6 +416,7 @@
             gameCtx.fillRect(px, py, psizePx, psizePx);
         }
 
+        // ===== 미니맵 =====
         function drawMiniMap() {
             miniCtx.clearRect(0, 0, miniCanvas.width, miniCanvas.height);
             const scale = Math.min((miniCanvas.width - 20) / cols, (miniCanvas.height - 20) / rows);
@@ -308,25 +440,41 @@
         function showStory() {
             if (inTransition) return;
             inTransition = true;
-            overlay.textContent = `레벨 ${level} 클리어!`; overlay.style.display = "flex";
+            overlay.textContent = `레벨 ${level} 클리어!`;
+            overlay.style.display = "flex";
             setTimeout(() => { overlay.textContent = "깊은 미궁 속으로..."; }, 1500);
-            setTimeout(() => { overlay.style.display = "none"; level++; initLevel(); inTransition = false; }, 3000);
+            setTimeout(() => {
+                overlay.style.display = "none";
+                level++; initLevel(); inTransition = false;
+            }, 3000);
         }
 
-        // 가상 조이스틱
+        // ===== 가상 조이스틱 =====
         let joyCenter = null, joyActive = false;
         function setStick(dx, dy) { stick.style.left = 50 + dx * 40 + "%"; stick.style.top = 50 + dy * 40 + "%"; }
-        function startInput(x, y) { const rect = joystick.getBoundingClientRect(); joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; joyActive = true; updateInput(x, y); }
-        function updateInput(x, y) { if (!joyActive || !joyCenter) return; let dx = x - joyCenter.x, dy = y - joyCenter.y, dist = Math.hypot(dx, dy), maxDist = 50; if (dist > maxDist) { dx = dx / dist * maxDist; dy = dy / dist * maxDist; } const nx = dx / maxDist, ny = dy / maxDist; velocity.x = nx; velocity.y = ny; setStick(nx, ny); }
+        function startInput(x, y) {
+            const rect = joystick.getBoundingClientRect();
+            joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            joyActive = true; updateInput(x, y);
+        }
+        function updateInput(x, y) {
+            if (!joyActive || !joyCenter) return;
+            let dx = x - joyCenter.x, dy = y - joyCenter.y;
+            const dist = Math.hypot(dx, dy), maxDist = 50;
+            if (dist > maxDist) { dx = dx / dist * maxDist; dy = dy / dist * maxDist; }
+            const nx = dx / maxDist, ny = dy / maxDist;
+            velocity.x = nx; velocity.y = ny; setStick(nx, ny);
+        }
         function endInput() { joyActive = false; velocity.x = 0; velocity.y = 0; setStick(0, 0); }
 
-        joystick.addEventListener("touchstart", (e) => startInput(e.touches[0].clientX, e.touches[0].clientY));
-        joystick.addEventListener("touchmove", (e) => updateInput(e.touches[0].clientX, e.touches[0].clientY));
+        joystick.addEventListener("touchstart", e => startInput(e.touches[0].clientX, e.touches[0].clientY));
+        joystick.addEventListener("touchmove", e => updateInput(e.touches[0].clientX, e.touches[0].clientY));
         joystick.addEventListener("touchend", endInput);
-        joystick.addEventListener("mousedown", (e) => startInput(e.clientX, e.clientY));
-        window.addEventListener("mousemove", (e) => { if (joyActive) updateInput(e.clientX, e.clientY); });
+        joystick.addEventListener("mousedown", e => startInput(e.clientX, e.clientY));
+        window.addEventListener("mousemove", e => { if (joyActive) updateInput(e.clientX, e.clientY); });
         window.addEventListener("mouseup", endInput);
 
+        // ===== 메인 루프 =====
         function gameLoop() { updatePlayer(); draw(); drawMiniMap(); requestAnimationFrame(gameLoop); }
 
         initLevel();
