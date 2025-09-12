@@ -5,220 +5,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>랜덤 미로 게임 (완성본)</title>
-    <style>
-        /* --------------------
-       레이아웃 (모바일 우선)
-       -------------------- */
-        html,
-        body {
-            height: 100%;
-            margin: 0;
-            font-family: Inter, system-ui, Segoe UI, Roboto, 'Noto Sans KR', sans-serif;
-            background: #0b0b0b;
-            color: #eee
-        }
-
-        .wrap {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 12px;
-            gap: 8px
-        }
-
-        /* 중앙 미로 캔버스 */
-        #gameWrapper {
-            width: 480px;
-            height: 480px;
-            position: relative;
-            background: #111;
-            border-radius: 6px;
-            overflow: hidden
-        }
-
-        canvas#game {
-            display: block;
-            width: 480px;
-            height: 480px;
-            background: #000
-        }
-
-        /* HUD (좌상단) */
-        .hud {
-            position: absolute;
-            left: 8px;
-            top: 8px;
-            z-index: 50;
-            display: flex;
-            flex-direction: column;
-            gap: 6px
-        }
-
-        .hud .panel {
-            background: rgba(10, 10, 10, 0.7);
-            padding: 8px;
-            border-radius: 8px;
-            border: 1px solid #222
-        }
-
-        .hud .items {
-            display: flex;
-            gap: 8px;
-            font-size: 20px
-        }
-
-        /* 도감 버튼 */
-        #codexBtn {
-            font-size: 18px;
-            padding: 6px 8px;
-            border-radius: 8px;
-            background: #222;
-            border: 1px solid #333;
-            color: #fff;
-            cursor: pointer
-        }
-
-        /* 미니맵 (우상단) */
-        #miniWrapper {
-            position: absolute;
-            right: 8px;
-            top: 8px;
-            z-index: 45
-        }
-
-        canvas#miniMap {
-            width: 260px;
-            height: 260px;
-            border-radius: 8px;
-            background: #080808;
-            display: block
-        }
-
-        /* 조이스틱 (하단 중앙 고정) */
-        #joystickWrap {
-            position: relative;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            margin-top: 8px
-        }
-
-        #joystick {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.03);
-            border: 2px solid rgba(255, 255, 255, 0.06);
-            position: relative;
-            touch-action: none
-        }
-
-        #stick {
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: rgba(255, 80, 80, 0.85);
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            transition: transform 0.02s
-        }
-
-        /* 오버레이 (스토리/인트로) */
-        .overlay {
-            position: fixed;
-            inset: 0;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 200
-        }
-
-        .overlay .panel {
-            background: #0f0f11;
-            padding: 18px;
-            border-radius: 12px;
-            min-width: 260px;
-            max-width: 90%;
-            color: #fff;
-            border: 1px solid #222
-        }
-
-        .overlay .panel img {
-            max-width: 100%;
-            border-radius: 6px;
-            display: block;
-            margin-bottom: 8px
-        }
-
-        .overlay .panel p {
-            margin: 8px 0
-        }
-
-        .overlay .actions {
-            text-align: right;
-            margin-top: 6px
-        }
-
-        button.primary {
-            background: #2b8fef;
-            border: none;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 8px;
-            cursor: pointer
-        }
-
-        button.ghost {
-            background: transparent;
-            border: 1px solid #444;
-            color: #ddd;
-            padding: 6px 10px;
-            border-radius: 8px
-        }
-
-        /* toast */
-        .toast {
-            position: fixed;
-            left: 50%;
-            bottom: 36px;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: #fff;
-            padding: 8px 12px;
-            border-radius: 8px;
-            z-index: 300
-        }
-
-        /* responsive */
-        @media (max-width:520px) {
-            #gameWrapper {
-                width: 360px;
-                height: 360px
-            }
-
-            canvas#game {
-                width: 360px;
-                height: 360px
-            }
-
-            #miniMap {
-                width: 200px;
-                height: 200px;
-
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="css/gpt.css">
 </head>
 
 <body>
     <div class="wrap">
-        <!-- 중앙 미로 캔버스 (fixed size) -->
-        <div id="gameWrapper">
-            <canvas id="game" width="480" height="480"></canvas>
 
+        <div id="hubmap">
             <!-- HUD (좌상단): 레벨 / 아이템 / 도감 버튼 -->
             <div class="hud">
                 <div class="panel" id="levelPanel">레벨: <span id="levelText">1</span></div>
@@ -227,10 +20,16 @@
                 <div class="panel"><button id="codexBtn">📖 도감</button></div>
             </div>
 
-        </div>
-        <!-- 미니맵 (우상단) -->
-        <div id="miniWrapper"><canvas id="miniMap" width="260" height="260"></canvas></div>
+            <!-- 미니맵 (우상단) -->
+            <div id="miniWrapper"><canvas id="miniMap" width="260" height="260"></canvas></div>
 
+        </div>
+
+        <!-- 중앙 미로 캔버스 (fixed size) -->
+        <div id="gameWrapper">
+            <canvas id="game" width="480" height="480"></canvas>
+
+        </div>
         <!-- 조이스틱 (하단 중앙 고정) -->
         <div id="joystickWrap">
             <div id="joystick">
@@ -695,6 +494,7 @@
                         saveStories();
                         showStoryOverlay('나침반', it.message, 3000);
                     } else if (it.type === 'key') {
+                        hasKey = true; // 현재 레벨에서 열쇠 소유
                         // key: fixed story text
                         unlockStory('key', storyTexts.key[0]);
                     } else {
@@ -720,6 +520,8 @@
            목표(출구) 도달 처리
            - 열쇠가 있어야 통과 가능 (key 해금)
            --------------------------- */
+        let hasKey = false;
+
         let levelCleared = false;
         function checkGoal() {
             // 플레이어와 목표 지점(셀 중앙) 거리 계산
@@ -727,7 +529,8 @@
 
             // 충분히 가까우면 도달로 판정
             if (d < 0.8 && !levelCleared) {
-                if (collectedStories['key']) {
+                if (hasKey) {
+                    // if (collectedStories['key']) {
                     // 🔑 열쇠를 가진 경우 → 레벨 클리어 처리
                     levelCleared = true;
 
@@ -866,6 +669,18 @@
         //     // ctx.fillStyle='#0f0'; ctx.fillRect(px-2,py-2,4,4);
         // }
 
+        function getBlockType(x, y) {
+            let h = 1, w = 1;
+
+            // 오른쪽이 벽이면 가로 확장
+            if (maze[y][x + 1] === 1) w++;
+            // 아래가 벽이면 세로 확장
+            if (maze[y + 1] && maze[y + 1][x] === 1) h++;
+
+            return `${w}x${h}`; // "1x1", "2x1", "1x2", "2x2" 등
+        }
+
+
         function draw() {
             ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
 
@@ -873,16 +688,83 @@
             const offsetX = gameCanvas.width / 2 - player.x * tileSize;
             const offsetY = gameCanvas.height / 2 - player.y * tileSize;
 
-            // 미로 그리기
+            // 방문 체크용 배열
+            const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+
+            // 벽 & 길
             for (let y = 0; y < rows; y++) {
                 for (let x = 0; x < cols; x++) {
-                    ctx.fillStyle = maze[y][x] === 1 ? "black" : "white";
-                    ctx.fillRect(
-                        x * tileSize + offsetX,
-                        y * tileSize + offsetY,
-                        tileSize,
-                        tileSize
-                    );
+                    if (maze[y][x] === 1 && !visited[y][x]) {
+                        // --- 가로 그룹핑 ---
+                        let lenX = 1;
+                        while (
+                            x + lenX < 3 &&
+                            maze[y][x + lenX] === 1 &&
+                            !visited[y][x + lenX]
+                        ) {
+                            lenX++;
+                        }
+
+                        if (lenX > 1) {
+                            // 가로 블럭
+                            let type = `1x${lenX}`;
+                            let img = blockImages[type] || blockImages["1x1"];
+                            ctx.drawImage(
+                                img,
+                                x * tileSize + offsetX,
+                                y * tileSize + offsetY,
+                                tileSize * lenX,
+                                tileSize
+                            );
+                            for (let i = 0; i < lenX; i++) visited[y][x + i] = true;
+                            continue;
+                        }
+
+                        // --- 세로 그룹핑 ---
+                        let lenY = 1;
+                        while (
+                            y + lenY < rows &&
+                            maze[y + lenY][x] === 1 &&
+                            !visited[y + lenY][x]
+                        ) {
+                            lenY++;
+                        }
+
+                        if (lenY > 1) {
+                            // 세로 블럭
+                            let type = `${lenY}x1`;
+                            let img = blockImages[type] || blockImages["1x1"];
+                            ctx.drawImage(
+                                img,
+                                x * tileSize + offsetX,
+                                y * tileSize + offsetY,
+                                tileSize,
+                                tileSize * lenY
+                            );
+                            for (let i = 0; i < lenY; i++) visited[y + i][x] = true;
+                            continue;
+                        }
+
+                        // 단일 블럭
+                        let img = blockImages["1x1"];
+                        ctx.drawImage(
+                            img,
+                            x * tileSize + offsetX,
+                            y * tileSize + offsetY,
+                            tileSize,
+                            tileSize
+                        );
+                        visited[y][x] = true;
+                    } else if (maze[y][x] === 0) {
+                        // 길
+                        ctx.fillStyle = "white";
+                        ctx.fillRect(
+                            x * tileSize + offsetX,
+                            y * tileSize + offsetY,
+                            tileSize,
+                            tileSize
+                        );
+                    }
                 }
             }
 
@@ -919,6 +801,8 @@
                 psize
             );
         }
+
+
 
         /* ---------------------------
            미니맵 렌더링
@@ -1147,6 +1031,7 @@
            레벨 / 초기화
            --------------------------- */
         function startLevel(lv) {
+            hasKey = false;
             level = lv || 1;
             // rows/cols growth: base 21 + (level-1)*2
             cols = 21 + (level - 1) * 2;
