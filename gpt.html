@@ -10,12 +10,16 @@
 
 <body>
     <div class="wrap">
-
+        <div id="ads"></div>
         <div id="hubmap">
             <!-- HUD (좌상단): 레벨 / 아이템 / 도감 버튼 -->
             <div class="hud">
-                <div class="panel" id="levelPanel">레벨: <span id="levelText">1</span></div>
-                <div class="panel items" id="itemPanel">아이템: <span id="itemKey">❌</span> <span id="itemCompass">❌</span>
+                <div class="hubup">
+                    <div class="panel" id="levelPanel">레벨: <span id="levelText">1</span></div>
+                    <div class="panel items" id="itemPanel">아이템: <span id="itemKey">❌</span> <span
+                            id="itemCompass">❌</span>
+
+                    </div>
                 </div>
                 <div class="panel"><button id="codexBtn">📖 도감</button></div>
             </div>
@@ -695,19 +699,20 @@
             for (let y = 0; y < rows; y++) {
                 for (let x = 0; x < cols; x++) {
                     if (maze[y][x] === 1 && !visited[y][x]) {
-                        // --- 가로 그룹핑 ---
+                        let placed = false;
+
+                        // --- 가로 그룹핑 (최대 3칸) ---
                         let lenX = 1;
                         while (
-                            x + lenX < 3 &&
+                            x + lenX < cols &&
+                            lenX < 3 &&
                             maze[y][x + lenX] === 1 &&
                             !visited[y][x + lenX]
                         ) {
                             lenX++;
                         }
-
                         if (lenX > 1) {
-                            // 가로 블럭
-                            let type = `1x${lenX}`;
+                            let type = `1x${lenX}`; // "1x2", "1x3"
                             let img = blockImages[type] || blockImages["1x1"];
                             ctx.drawImage(
                                 img,
@@ -717,44 +722,47 @@
                                 tileSize
                             );
                             for (let i = 0; i < lenX; i++) visited[y][x + i] = true;
-                            continue;
+                            placed = true;
                         }
 
-                        // --- 세로 그룹핑 ---
-                        let lenY = 1;
-                        while (
-                            y + lenY < rows &&
-                            maze[y + lenY][x] === 1 &&
-                            !visited[y + lenY][x]
-                        ) {
-                            lenY++;
+                        // --- 세로 그룹핑 (최대 3칸) ---
+                        if (!placed) {
+                            let lenY = 1;
+                            while (
+                                y + lenY < rows &&
+                                lenY < 3 &&
+                                maze[y + lenY][x] === 1 &&
+                                !visited[y + lenY][x]
+                            ) {
+                                lenY++;
+                            }
+                            if (lenY > 1) {
+                                let type = `${lenY}x1`; // "2x1", "3x1"
+                                let img = blockImages[type] || blockImages["1x1"];
+                                ctx.drawImage(
+                                    img,
+                                    x * tileSize + offsetX,
+                                    y * tileSize + offsetY,
+                                    tileSize,
+                                    tileSize * lenY
+                                );
+                                for (let i = 0; i < lenY; i++) visited[y + i][x] = true;
+                                placed = true;
+                            }
                         }
 
-                        if (lenY > 1) {
-                            // 세로 블럭
-                            let type = `${lenY}x1`;
-                            let img = blockImages[type] || blockImages["1x1"];
+                        // --- 단일 블럭 ---
+                        if (!placed) {
+                            let img = blockImages["1x1"];
                             ctx.drawImage(
                                 img,
                                 x * tileSize + offsetX,
                                 y * tileSize + offsetY,
                                 tileSize,
-                                tileSize * lenY
+                                tileSize
                             );
-                            for (let i = 0; i < lenY; i++) visited[y + i][x] = true;
-                            continue;
+                            visited[y][x] = true;
                         }
-
-                        // 단일 블럭
-                        let img = blockImages["1x1"];
-                        ctx.drawImage(
-                            img,
-                            x * tileSize + offsetX,
-                            y * tileSize + offsetY,
-                            tileSize,
-                            tileSize
-                        );
-                        visited[y][x] = true;
                     } else if (maze[y][x] === 0) {
                         // 길
                         ctx.fillStyle = "white";
