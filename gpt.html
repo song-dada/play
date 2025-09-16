@@ -69,6 +69,9 @@
 
         ///// 저장 키 & 초기 스토리 데이터
         const STORAGE_KEY = 'maze_collectedStories_v1';
+        // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
+        let startTime = 0;
+        // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
 
         // 스토리 슬롯 및 텍스트 (compass는 레벨별 다중 메시지 풀)
         const storySlots = [
@@ -241,63 +244,6 @@
             // goal 칸은 벽으로 유지 (출구 표시용)
             maze[goal.y][goal.x] = 2;
 
-
-            // // 테두리 후보 수집 (0 ~ length-1 포함)
-            // let possibleGoals = [];
-
-            // // 상단, 하단 테두리
-            // for (let x = 0; x < cols; x++) {
-            //     if (maze[0][x] === 0) possibleGoals.push({ x, y: 0 });
-            //     if (maze[rows - 1][x] === 0) possibleGoals.push({ x, y: rows - 1 });
-            // }
-
-            // // 좌측, 우측 테두리
-            // for (let y = 1; y < rows - 1; y++) { // 상단/하단은 이미 포함했으므로 1~rows-2
-            //     if (maze[y][0] === 0) possibleGoals.push({ x: 0, y });
-            //     if (maze[y][cols - 1] === 0) possibleGoals.push({ x: cols - 1, y });
-            // }
-
-            // // fallback
-            // if (possibleGoals.length === 0) possibleGoals.push({ x: cols - 1, y: rows - 1 });
-
-            // // goal 랜덤 선택
-            // goal = possibleGoals[Math.floor(Math.random() * possibleGoals.length)];
-
-            // // goal 위치는 반드시 길로
-            // maze[goal.y][goal.x] = 0;
-
-            // // ==============================
-            // // goal: 미로 테두리 중 랜덤 위치로 지정
-            // // - 테두리(상단, 하단, 좌측, 우측) 중 길(0)인 칸을 수집
-            // // - 랜덤 선택
-            // // - 만약 테두리에 길이 없으면 fallback으로 오른쪽 아래 지정
-            // // ==============================
-            // let possibleGoals = [];
-
-            // // 상단, 하단 테두리
-            // for (let x = 1; x < cols - 1; x++) {
-            //     if (maze[0][x] === 0) possibleGoals.push({ x, y: 0 });
-            //     if (maze[rows - 1][x] === 0) possibleGoals.push({ x, y: rows - 1 });
-            // }
-
-            // // 좌측, 우측 테두리
-            // for (let y = 1; y < rows - 1; y++) {
-            //     if (maze[y][0] === 0) possibleGoals.push({ x: 0, y });
-            //     if (maze[y][cols - 1] === 0) possibleGoals.push({ x: cols - 1, y });
-            // }
-
-            // // 테두리에 길이 없을 경우 fallback
-            // if (possibleGoals.length === 0) possibleGoals.push({ x: cols - 2, y: rows - 2 });
-
-            // // goal 선택
-            // goal = possibleGoals[Math.floor(Math.random() * possibleGoals.length)];
-
-            // // goal 위치는 반드시 길로 만들기
-            // maze[goal.y][goal.x] = 0;
-
-            // goal.x = cols - 2; goal.y = rows - 2;
-            // maze[goal.y][goal.x] = 0;
-
             // reveal/visited 초기화
             revealMap = Array.from({ length: rows }, () => Array(cols).fill(false));
             visitedMap = Array.from({ length: rows }, () => Array(cols).fill(false));
@@ -326,6 +272,7 @@
         }
 
         function placeItemsForLevel(lv) {
+            console.trace("startLevel 호출", { lv, level });
             items = [];
             // key
             const k = findRandomPathCell(true);
@@ -527,55 +474,37 @@
         let hasKey = false;
 
         let levelCleared = false;
+
         function checkGoal() {
-            // 플레이어와 목표 지점(셀 중앙) 거리 계산
             const d = dist(player.x, player.y, goal.x + 0.5, goal.y + 0.5);
 
-            // 충분히 가까우면 도달로 판정
+            console.log("checkGoal 실행", { d, levelCleared, hasKey, level });
+
             if (d < 0.8 && !levelCleared) {
                 if (hasKey) {
-                    // if (collectedStories['key']) {
-                    // 🔑 열쇠를 가진 경우 → 레벨 클리어 처리
                     levelCleared = true;
 
-                    // 도감에 레벨 클리어 스토리 해금
-                    unlockStory(
-                        `level${level}`,
-                        (storyTexts[`level${level}`] && storyTexts[`level${level}`][0]) || `레벨 ${level} 클리어`
-                    );
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                    console.log("GOAL!", { elapsed });
 
-                    // 오버레이로 알림
-                    showStoryOverlay('레벨 클리어', `레벨 ${level} 클리어! 다음 레벨로 이동합니다.`, 2500);
-
-                    // 다음 레벨 시작
+                    // ⚠️ 레벨 이동은 alert 뒤로 지연시킴
                     setTimeout(() => {
-                        level++;
-                        startLevel(level);
-                    }, 2300);
+                        alert(`레벨 ${level} 클리어!\n플레이타임: ${elapsed}초`);
 
+                        if (level < 3) {
+                            level++;
+                            startLevel(level);
+                            levelCleared = false; // 여기서만 초기화
+                        } else {
+                            alert("레벨 3까지 클리어 완료!");
+                        }
+                    }, 100);  // alert 띄운 후에 레벨 이동
                 } else {
-                    // 🔑 없으면 출구 통과 불가
-                    showToast('아이템이 부족합니다! 🔑를 모아야 합니다.', 1800);
+                    console.log("열쇠 없음");
+                    showToast("아이템이 부족합니다! 🔑를 모아야 합니다.", 1800);
                 }
             }
         }
-
-
-        // function checkGoal() {
-        //     const d = dist(player.x, player.y, goal.x + 0.5, goal.y + 0.5);
-        //     if (d < 0.8 && !levelCleared) {
-        //         if (collectedStories['key']) {
-        //             levelCleared = true;
-        //             // unlock level story
-        //             unlockStory(`level${level}`, (storyTexts[`level${level}`] && storyTexts[`level${level}`][0]) || `레벨 ${level} 클리어`);
-        //             showStoryOverlay('레벨 클리어', `레벨 ${level} 클리어! 다음 레벨로 이동합니다.`, 2500);
-        //             setTimeout(() => { level++; startLevel(level); }, 2300);
-        //         } else {
-        //             // can't pass
-        //             showToast('아이템이 부족합니다! 🔑를 모아야 합니다.', 1800);
-        //         }
-        //     }
-        // }
 
         /* ===========================
            그리기 로직
@@ -597,81 +526,6 @@
             return { w, h };
         }
 
-        // function draw() {
-        //     // clear
-        //     ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
-
-        //     // draw tiles. We will draw block images only for top-left of a run to avoid overlap.
-        //     for (let y = 0; y < rows; y++) {
-        //         for (let x = 0; x < cols; x++) {
-        //             const px = x * tileSize, py = y * tileSize;
-        //             // if tile not yet revealed, draw dark overlay (fog)
-        //             const revealed = revealMap[y] && revealMap[y][x];
-        //             if (!revealed) {
-        //                 // cover with dark rectangle
-        //                 ctx.fillStyle = '#050506';
-        //                 ctx.fillRect(px, py, tileSize, tileSize);
-        //                 continue;
-        //             }
-        //             if (maze[y][x] === 1) {
-        //                 // draw wall using block images where appropriate
-        //                 // Only draw when this tile is top-left of a block run (no wall at left and above)
-        //                 const leftIsWall = (x > 0 && maze[y][x - 1] === 1);
-        //                 const aboveIsWall = (y > 0 && maze[y - 1][x] === 1);
-        //                 if (!leftIsWall && !aboveIsWall) {
-        //                     const { w, h } = getBlockRunSize(x, y);
-        //                     const key = `${w}x${h}`;
-        //                     const img = blockImages[key];
-        //                     if (img && img.complete && img.naturalWidth > 0) {
-        //                         // draw scaled to (w*tileSize, h*tileSize)
-        //                         ctx.drawImage(img, px, py, w * tileSize, h * tileSize);
-        //                     } else {
-        //                         // fallback fill
-        //                         ctx.fillStyle = '#222';
-        //                         ctx.fillRect(px, py, w * tileSize, h * tileSize);
-        //                     }
-        //                 } else {
-        //                     // If not top-left, just leave it (it will be covered by the top-left draw), but ensure single tile fallback if images not ready:
-        //                     // draw small fallback for individual uncovered wall tiles
-        //                     ctx.fillStyle = '#222';
-        //                     ctx.fillRect(px, py, tileSize, tileSize);
-        //                 }
-        //             } else {
-        //                 // floor
-        //                 ctx.fillStyle = '#cfcfcf';
-        //                 ctx.fillRect(px, py, tileSize, tileSize);
-        //             }
-        //         }
-        //     }
-
-        //     // draw goal if revealed
-        //     if (revealMap[goal.y] && revealMap[goal.y][goal.x]) {
-        //         ctx.fillStyle = '#2ecc71';
-        //         ctx.fillRect(goal.x * tileSize + tileSize * 0.15, goal.y * tileSize + tileSize * 0.15, tileSize * 0.7, tileSize * 0.7);
-        //     }
-
-        //     // draw items (only if their tile revealed)
-        //     for (const it of items) {
-        //         if (it.collected) continue;
-        //         if (!revealMap[it.y] || !revealMap[it.y][it.x]) continue;
-        //         const cx = it.x * tileSize + tileSize / 2, cy = it.y * tileSize + tileSize / 2;
-        //         ctx.beginPath();
-        //         ctx.arc(cx, cy, tileSize * 0.28, 0, Math.PI * 2);
-        //         if (it.type === 'key') ctx.fillStyle = '#ffcc00';
-        //         else if (it.type === 'compass') ctx.fillStyle = '#7f5cff';
-        //         else ctx.fillStyle = '#fff';
-        //         ctx.fill();
-        //     }
-
-        //     // draw player (as square)
-        //     const px = player.x * tileSize, py = player.y * tileSize;
-        //     const psize = player.size * tileSize;
-        //     ctx.fillStyle = '#ff4b4b';
-        //     ctx.fillRect(px - psize / 2, py - psize / 2, psize, psize);
-
-        //     // debug: draw player center
-        //     // ctx.fillStyle='#0f0'; ctx.fillRect(px-2,py-2,4,4);
-        // }
 
         function getBlockType(x, y) {
             let h = 1, w = 1;
@@ -916,47 +770,7 @@
            메인 업데이트 루프
            - 입력 처리(키보드+조이스틱) -> 물리(충돌검사) -> 시야/수집/목표 체크 -> 그리기
            --------------------------- */
-        // function update(now) {
-        //     const dt = Math.min(0.05, (now - lastTime) / 1000);
-        //     lastTime = now;
 
-        //     // keyboard input (if no joystick active, keyboard will set velocity)
-        //     if (!joyActive) {
-        //         let ix = 0, iy = 0;
-        //         if (keys['arrowup'] || keys['w']) iy -= 1;
-        //         if (keys['arrowdown'] || keys['s']) iy += 1;
-        //         if (keys['arrowleft'] || keys['a']) ix -= 1;
-        //         if (keys['arrowright'] || keys['d']) ix += 1;
-        //         if (ix !== 0 || iy !== 0) {
-        //             const len = Math.hypot(ix, iy) || 1;
-        //             player.vx = (ix / len) * speed;
-        //             player.vy = (iy / len) * speed;
-        //         } else {
-        //             // no keys: if joystick not active, stop
-        //             player.vx = 0; player.vy = 0;
-        //         }
-        //     }
-
-        //     // attempt movement with sliding
-        //     let nextX = player.x + player.vx * dt;
-        //     let nextY = player.y + player.vy * dt;
-        //     if (canMoveTo(nextX, player.y)) player.x = nextX; else player.vx = 0;
-        //     if (canMoveTo(player.x, nextY)) player.y = nextY; else player.vy = 0;
-
-        //     // reveal and mark visited
-        //     revealAround(player.x, player.y);
-
-        //     // collect items
-        //     tryCollectItems();
-
-        //     // goal check
-        //     checkGoal();
-
-        //     // draw
-        //     draw();
-        //     drawMiniMap();
-        //     requestAnimationFrame(update);
-        // }
         // 플레이어 크기를 고려한 충돌 검사
         function canMoveTo(x, y) {
             const half = player.size / 2; // 플레이어 절반 크기
@@ -1046,6 +860,9 @@
             rows = 21 + (level - 1) * 2;
             if (cols % 2 === 0) cols++;
             if (rows % 2 === 0) rows++;
+            // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
+            startTime = Date.now();
+            // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
             generateMaze(cols, rows);
             // reset player to start
             player.x = 1.5; player.y = 1.5; player.vx = 0; player.vy = 0;
@@ -1109,6 +926,7 @@
            - 블럭 디테일: 현재 1x1~3x3 그리드를 지원합니다. 필요 시 코너/ T자/ 십자 등 더 섬세한 매핑 로직을 추가하세요.
            - 적/트랩 추가: items와 유사하게 적 객체(위치, 패턴)를 추가하고 update()에서 충돌/이동 로직을 구현하면 됩니다.
            --------------------------- */
+
 
     </script>
 </body>

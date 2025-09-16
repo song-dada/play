@@ -221,7 +221,7 @@
 
      canvas#game {
          width: 100vw;
-         height: 50vh
+         height: 100vw
      }
 
      canvas#miniMap {
@@ -230,80 +230,34 @@
 
      }
 
-     #hubmap {
-         /* display: flex;
-         justify-content: space-evenly;
-         align-items: center;
-         width: 100vw;
-         height: 20vh;
-         position: relative; */
-     }
+     /* #hubmap {
+     } */
 
      /* HUD (좌상단) */
-     .hud {
-         /* position: absolute; */
-         /* position: inline-block; */
-         /* float: left;
-         left: 8px;
-         top: 8px;
-         z-index: 50;
-         display: flex;
-         flex-direction: column;
-         gap: 6px */
-     }
+     /* .hud {
+     } */
 
-     .hud .panel {
-         /* background: rgba(10, 10, 10, 0.7);
-         padding: 8px;
-         border-radius: 8px;
-         border: 1px solid #222 */
-     }
+     /* .hud .panel {
+      } */
 
-     .hud .items {
-         /* display: flex;
-         gap: 8px;
-         font-size: 20px */
-     }
+     /* .hud .items {
+     } */
 
      /* 도감 버튼 */
      #codexBtn {
-         /* font-size: 18px;
-         padding: 6px 8px;
-         border-radius: 8px;
-         background: #222;
-         border: 1px solid #333;
-         color: #fff; */
-         /* cursor: pointer */
          width: 100%;
          margin-left: 50%;
          transform: translateX(-50%);
      }
 
      /* 조이스틱 (하단 중앙 고정) */
-     #joystickWrap {
-         /* position: relative; */
-         /* width: 100%;
-         display: flex;
-         justify-content: center;
-         margin-top: 8px */
-     }
+     /* #joystickWrap {
+     } */
 
-     #joystick {
-         /* width: 120px;
-         height: 120px;
-         border-radius: 50%;
-         background: rgba(255, 255, 255, 0.03);
-         border: 2px solid rgba(255, 255, 255, 0.06);
-         position: relative;
-         touch-action: none */
-     }
+     /* #joystick {
+     } */
 
      #stick {
-         /* width: 44px;
-         height: 44px;
-         border-radius: 50%;
-         background: rgba(255, 80, 80, 0.85); */
-         /* position: absolute; */
          left: 50%;
          top: 50%;
          transform: translate(-50%, -50%);
