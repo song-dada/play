@@ -70,7 +70,9 @@
         ///// 저장 키 & 초기 스토리 데이터
         const STORAGE_KEY = 'maze_collectedStories_v1';
         // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
-        let startTime = 0;
+        let startTime = 0;           // 레벨 시작 시 설정 (이미 쓰고 계신 변수)
+        let timeLimitSeconds = 90;   // 현재 레벨의 시간제한(초)
+        let timeUp = false;          // 시간초과 발생 플래그
         // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
 
         // 스토리 슬롯 및 텍스트 (compass는 레벨별 다중 메시지 풀)
@@ -109,6 +111,15 @@
         }
         function saveStories() {
             try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collectedStories)); } catch (e) { console.warn('saveStories', e); }
+        }
+
+        // 권장 기본값 함수 (원하면 조정)
+        function getTimeLimitForLevel(lv) {
+            if (lv <= 1) return 90;      // 1분30초
+            if (lv === 2) return 120;    // 2분
+            if (lv === 3) return 150;    // 2분30초
+            // 레벨이 높아질수록 +30초씩
+            return 150 + (lv - 3) * 30;
         }
 
         /* ---------------------------
@@ -489,7 +500,7 @@
 
                     // ⚠️ 레벨 이동은 alert 뒤로 지연시킴
                     setTimeout(() => {
-                        alert(`레벨 ${level} 클리어!\n플레이타임: ${elapsed}초`);
+                        // alert(`레벨 ${level} 클리어!\n플레이타임: ${elapsed}초`);
 
                         if (level < 3) {
                             level++;
@@ -662,6 +673,9 @@
                 psize,
                 psize
             );
+
+            // 시간 표시를 캔버스에 그릴 경우
+            drawTimer(ctx);
         }
 
 
@@ -834,6 +848,9 @@
                 player.vy = 0; // 벽 충돌 → Y방향 정지
             }
 
+            // 시야/아이템/목표 체크 전에 시간 체크(혹은 후에)
+            checkTimeout();
+
             // ── 시야 & 방문 경로 업데이트
             revealAround(player.x, player.y);
 
@@ -861,7 +878,12 @@
             if (cols % 2 === 0) cols++;
             if (rows % 2 === 0) rows++;
             // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
+            // startTime = Date.now();
+            // 시간제한 초기화
+            timeLimitSeconds = getTimeLimitForLevel(level);
             startTime = Date.now();
+            timeUp = false;
+            // levelCleared = false; 등 기존 초기화
             // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
             generateMaze(cols, rows);
             // reset player to start
@@ -872,6 +894,128 @@
             updateHud();
         }
 
+        function getRemainingSeconds() {
+            if (!startTime) return timeLimitSeconds;
+            const elapsed = (Date.now() - startTime) / 1000;
+            return Math.max(0, timeLimitSeconds - elapsed);
+        }
+        // HUD 또는 캔버스에 시간 그리기: draw() 또는 별도 drawHUD() 안에서 호출
+        function drawTimer(ctx) {
+            const rem = getRemainingSeconds();
+            const sec = Math.floor(rem);
+            const mm = Math.floor(sec / 60);
+            const ss = sec % 60;
+            const text = `${mm}:${String(ss).padStart(2, '0')}`;
+
+            // 예: 좌상단 HUD에 텍스트로 그리기 (canvas drawing)
+            ctx.save();
+            ctx.font = '18px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            // 남은시간 색상: 10초 이하면 빨강
+            ctx.fillStyle = rem <= 10 ? 'tomato' : '#fff';
+            ctx.fillText(`시간: ${text}`, 12, 14); // 위치는 조정하세요
+            ctx.restore();
+        }
+
+        // 시간 만료 처리
+        function handleTimeUp() {
+            if (timeUp) return; // 중복 방지
+            timeUp = true;
+
+            // 플레이어에게 알려주기 (원하시면 overlay로 바꿀 수 있음)
+            const elapsedTotal = ((Date.now() - startTime) / 1000).toFixed(1);
+            // 기본 동작: 알림 후 동일 레벨 재시작 (원하면 레벨 종료/게임오버로 변경)
+            // setTimeout(() => {
+            //     alert(`시간 초과! 플레이타임: ${elapsedTotal}초\n레벨을 다시 시작합니다.`);
+            //     // 재시작 동작: 같은 레벨 다시 시작
+            //     startLevel(level);
+            // }, 50);
+            showGameOverOverlay({
+                title: '시간 초과!',
+                message: `플레이타임: ${elapsed}초\n레벨을 다시 시작하시겠습니까?`,
+            });
+        }
+
+        // ---------- 게임오버 오버레이 생성 함수 ----------
+        function showGameOverOverlay({ title = '게임 오버', message = '' } = {}) {
+            // overlay 및 overlayPanel은 기존에 정의되어 있다고 가정
+            overlayPanel.innerHTML = ''; // 기존 내용 초기화
+
+            const panel = document.createElement('div');
+            panel.className = 'panel';
+            const h3 = document.createElement('h3');
+            h3.textContent = title;
+            panel.appendChild(h3);
+
+            if (message) {
+                const p = document.createElement('p');
+                // 줄바꿈 보존
+                p.innerText = message;
+                panel.appendChild(p);
+            }
+
+            // 버튼 영역
+            const actions = document.createElement('div');
+            actions.className = 'actions';
+
+            // 다시 시작 버튼: 같은 레벨 재시작
+            const restartBtn = document.createElement('button');
+            restartBtn.className = 'primary';
+            restartBtn.textContent = '다시 시작';
+            restartBtn.onclick = () => {
+                overlay.style.display = 'none';
+                // 재시작: 같은 레벨
+                timeUp = false;
+                // 재시작 전에 필요한 초기화(아이템 리셋 등)는 startLevel에서 처리
+                startLevel(level);
+                // 루프가 정지 상태라면 재개
+                requestAnimationFrame(update);
+            };
+            actions.appendChild(restartBtn);
+
+            // 종료 버튼: 프롤로그(인트로)로 이동
+            const exitBtn = document.createElement('button');
+            exitBtn.className = 'ghost';
+            exitBtn.style.marginLeft = '8px';
+            exitBtn.textContent = '종료';
+            exitBtn.onclick = () => {
+                overlay.style.display = 'none';
+                timeUp = false;
+
+                // 인트로 보여주기 (사용하던 showIntroStart 함수가 있다고 가정)
+                // 도감/진행 정보는 원하면 초기화하거나 보존하도록 변경 가능
+                if (typeof showIntroStart === 'function') {
+                    showIntroStart();
+                } else {
+                    // fallback: 강제로 인트로 텍스트 표시
+                    overlayPanel.innerHTML = `<div class="panel"><h3>프롤로그</h3><p>${(storyTexts.intro && storyTexts.intro[0]) || '프롤로그'}</p><div class="actions"><button id="startAgain" class="primary">게임 시작</button></div></div>`;
+                    overlay.style.display = 'flex';
+                    document.getElementById('startAgain').onclick = () => {
+                        overlay.style.display = 'none';
+                        // 새 게임을 위해 레벨 초기화
+                        level = 1;
+                        startLevel(1);
+                        requestAnimationFrame(update);
+                    };
+                }
+            };
+            actions.appendChild(exitBtn);
+
+            panel.appendChild(actions);
+
+            overlayPanel.appendChild(panel);
+            overlay.style.display = 'flex';
+        }
+
+        // update() 내부에 체크 추가 (기존 update() 최상단/중간에 넣기 좋음)
+        function checkTimeout() {
+            if (timeUp) return;
+            const rem = getRemainingSeconds();
+            if (rem <= 0) {
+                handleTimeUp();
+            }
+        }
         /* ---------------------------
            인트로 흐름:
            - 처음 실행 시 overlay에 시작 버튼 표시
