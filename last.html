@@ -1,0 +1,1529 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>랜덤 미로 게임 (리팩토링 버전)</title>
+    <link rel="stylesheet" href="css/gpt.css">
+    <style>
+        .loading-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 6px solid rgba(255, 255, 255, 0.15);
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-msg {
+            font-size: 16px;
+            color: #fff;
+            text-align: center;
+            max-width: 300px;
+        }
+
+        .toast {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 30px;
+            background: #222;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            opacity: 0.95;
+            z-index: 9999;
+        }
+
+        #codexPanel .group {
+            padding: 10px 0;
+            border-bottom: 1px dashed #333;
+            cursor: pointer;
+        }
+
+        #codexPanel .group .meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #codexPanel .group .meta .title {
+            font-weight: 600;
+        }
+
+        #codexPanel .group .meta .count {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        pre.story {
+            white-space: pre-wrap;
+            margin: 6px 0;
+            background: #0f0f0f;
+            color: #eaeaea;
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        /* 작은 디버그 버튼 (선택) */
+        .debug-reset {
+            position: fixed;
+            right: 12px;
+            top: 12px;
+            z-index: 9999;
+            font-size: 12px;
+        }
+
+        /* 리팩토링된 버튼 스타일 */
+        .hud-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 8px;
+            justify-content: flex-end;
+            /* 오른쪽 정렬 */
+        }
+
+        .hud-actions button {
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 0;
+            cursor: pointer;
+            background: #2a2a2a;
+            color: #fff;
+        }
+
+        .hud-actions button.primary {
+            background: #3b82f6;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div id="ads"></div>
+        <div id="hubmap">
+            <div class="hud">
+                <div class="hubup">
+                    <div class="panel" id="levelPanel">
+                        레벨: <span id="levelText">1</span>
+                    </div>
+                    <div class="panel items" id="itemPanel">
+                        아이템:
+                        <img id="itemKeyEl" src="img/item/Bread_empty.png" alt="key" width="24" height="24">
+                        <img id="itemCompassEl" src="img/item/Letter_empty.png" alt="compass" width="24" height="24">
+                    </div>
+                </div>
+                <div class="hud-actions">
+                    <button id="homeBtn">홈</button>
+                    <button class="primary" id="freshStartBtn">처음부터 시작</button>
+                    <button id="codexBtn">📖 도감</button>
+                </div>
+            </div>
+            <div id="miniWrapper"><canvas id="miniMap" width="260" height="260"></canvas></div>
+        </div>
+
+        <div id="gameWrapper">
+            <canvas id="game" width="480" height="480"></canvas>
+        </div>
+
+        <div id="joystickWrap">
+            <div id="joystick">
+                <div id="stick"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="overlay" class="overlay" style="display:none">
+        <div class="panel" id="overlayPanel"></div>
+    </div>
+
+    <div id="codexOverlay" class="overlay" style="display:none">
+        <div class="panel" id="codexPanel"></div>
+    </div>
+
+    <button id="resetSpawn" class="debug-reset">Reset Spawn Order (session)</button>
+
+    <script>
+        (function () {
+            /* =========================
+               1. 상수 정의
+               ========================= */
+            const STORAGE_KEY = 'maze_collectedStories_v1';
+            const SPAWN_KEY = 'maze_spawnOrder_v1';        // sessionStorage key for spawn order array (stringified)
+            const SPAWN_INDEX_KEY = 'maze_spawnIndex_v1';  // sessionStorage key for current spawn index
+
+            // 그룹 정의 (parts 순서 중요) - fullStoryId 추가
+            const storyGroups = [
+                { id: 'siblings', label: '남매 (마트 기록)', parts: ['siblings_1', 'siblings_2', 'siblings_3'], fullStoryId: 'siblings_full' },
+                { id: 'maid', label: '가정부 (대저택 기록)', parts: ['maid_1', 'maid_2', 'maid_3'], fullStoryId: 'maid_full' },
+                { id: 'traveler', label: '여행객 (길 위의 기록)', parts: ['traveler_1', 'traveler_2', 'traveler_3'], fullStoryId: 'traveler_full' },
+                { id: 'sibling_younger', label: '남매(동생) (희망 붕괴)', parts: ['sibling_younger_1', 'sibling_younger_2', 'sibling_younger_3'], fullStoryId: 'sibling_younger_full' },
+                { id: 'weak_union', label: '약자 연합 (여행객과 함께한 기록)', parts: ['weak_union_1', 'weak_union_2', 'weak_union_3'], fullStoryId: 'weak_union_full' }
+            ];
+
+            const ALL_NOTE_IDS = [].concat(...storyGroups.map(g => g.parts));
+            const storySlots = storyGroups.map(g => ({ id: g.id, label: g.label }));
+
+            const storyTexts = {
+                intro: ['깊은 미궁 속으로 발을 내딛었다. 어둠 속에서 무언가 속삭이는 듯하다...'],
+                key: ['낡은 열쇠를 손에 넣었다. 녹슨 금속이 차갑게 닿는다.'],
+                // (기존 compass 보존 - 내부 로직에서는 이제 사용하지 않음)
+                compass: [
+                    ['서쪽에서 기묘한 기운이 느껴진다...', '나침반이 갑자기 흔들리며 방향을 잃는다...'],
+                    ['멀리서 낮은 울음소리가 들려온다...', '벽에 새겨진 고대 문양이 눈에 들어왔다...'],
+                    ['‘출구는 없다’는 목소리가 메아리쳤다...', '차갑고 습한 공기가 더 짙어졌다...']
+                ],
+                level1: ['첫 번째 미궁을 통과했다!'],
+                level2: ['더 깊은 곳으로 발걸음을 옮긴다...'],
+                ending: ['드디어 미궁에서 탈출했다!'],
+
+                // user notes (쪽지 파편)
+                siblings_1: ["여기서 식량과 약품을 확보했다.\n처음엔 살아남았다는 안도뿐이었다."],
+                siblings_2: ["라디오가 잡혔다.\n노이즈 속에서… “캠프.”\n생존자 캠프라 들렸다."],
+                siblings_3: ["(38.6-34.4)… 전부는 번졌다.\n좌표다. 우리는 그곳으로 간다."],
+
+                maid_1: ["저택은 조용했다.\n세상이 어지럽다 해도, 여긴 변함없었다."],
+                maid_2: ["집사가 피를 토했다.\n사모님은 미소를 지으셨다.\n그 웃음이… 두려웠다."],
+                maid_3: ["일주일을 버텼다.\n더는 못 한다.\n나는 이곳을 떠난다."],
+
+                traveler_1: ["처음 보는 무리와 합류했다.\n낯선 나를 반겨주어… 다행이었다."],
+                traveler_2: ["길은 막혔고, 위험은 많았다.\n하지만 혼자였다면 벌써 포기했을 것이다."],
+                traveler_3: ["내일은 더 나아지리라 믿는다.\n우리가 도착할 곳은 여기 아니니까."],
+
+                sibling_younger_1: ["누나가 기침을 시작했다.\n멀쩡했던 사람이, 갑자기."],
+                sibling_younger_2: ["열은 오르고, 기침은 거칠어졌다.\n내 약을 건넸지만… 고갤 저었다."],
+                sibling_younger_3: ["누나는 쓰러졌다.\n나는 살아서 캠프로 갈게.\n잘 자, 누나."],
+
+                weak_union_1: ["우린 약자였다.\n그래서 모였다. 서로를 지키기 위해."],
+                weak_union_2: ["뒤따르던 그를 받아들였다.\n낯설었지만, 적은 아니었다."],
+                weak_union_3: ["아침, 그는 이미 식어 있었다.\n장례를 치르고… 발걸음을 떼었다."],
+
+                // --- 전체 스토리 (Full Story) - 쪽지를 모두 모았을 때 해금되는 장문 스토리 ---
+                siblings_full: [
+                    "누나는 식량과 약품을 챙기는 데 능숙했다. 황폐해진 마트에서 찾은 생존 물품은 잠시나마 안도감을 주었다. 그러나 희망은 무선 통신에서 찾은 '캠프'라는 단어였다. 우리는 그곳으로 가기 위해 지도에 좌표를 새겼다. 이제 이 미궁을 벗어나 그 좌표(38.6-34.4)로 향하는 것이 우리의 유일한 목표가 되었다. 이 낡은 기록은 우리의 여정의 시작을 알린다."
+                ],
+                maid_full: [
+                    "대저택은 세상의 혼란과는 무관하게 고요했다. 가정부인 나는 이 평온함이 기이하게 느껴졌다. 어느 날, 집사님이 피를 토하는 모습을 보았고, 그때 사모님의 차가운 미소는 나에게 공포 그 자체였다. 이 저택은 안전한 피난처가 아니었다. 일주일을 버티고, 더 이상 버틸 수 없다고 판단한 나는 몰래 저택을 떠나기로 결심했다. 이 기록은 내가 탈출하기 직전의 심정을 담고 있다."
+                ],
+                traveler_full: [
+                    "나는 홀로 떠돌던 여행객이었다. 길 위에서 우연히 만난 무리는 낯선 나를 조건 없이 받아주었고, 나는 그들의 따뜻함에 감사했다. 미궁은 막혀있었고, 길은 위험으로 가득했지만, 혼자였다면 이미 좌절했을 것이다. 나는 그들과 함께라면 더 나은 곳에 도착할 수 있을 거라 믿었다. 매일 밤, 우리는 내일을 기약하며 잠들었다. 이 이야기는 내가 그들과 함께했던, 짧고도 희망찼던 기록이다."
+                ],
+                sibling_younger_full: [
+                    "누나가 기침을 시작한 건 갑작스러운 일이었다. 처음엔 단순한 감기라 생각했지만, 그녀의 열은 걷잡을 수 없이 올랐고 기침은 흉측하게 거칠어졌다. 나는 필사적으로 약을 건넸지만, 누나는 고개를 저었다. 그녀는 결국 쓰러졌고, 나는 그녀를 둔 채 살아서 캠프로 가야만 했다. 미안함과 슬픔을 뒤로한 채, 나는 누나에게 마지막 작별 인사를 고했다. 이 기록은 희망이 붕괴된 순간의 참혹한 증언이다."
+                ],
+                weak_union_full: [
+                    "우리는 세상에서 가장 약한 존재들이었기에, 서로를 지키기 위해 연합했다. 우리는 생존이라는 공동의 목표 아래 낯선 이들을 받아들이는 데 주저하지 않았다. 여행객이 그중 한 명이었다. 그는 조용했지만 강인했다. 그러나 생존은 잔혹했다. 어느 아침, 그는 이미 차갑게 식어 있었다. 우리는 그의 장례를 치렀고, 슬픔을 이겨내며 다시 발걸음을 떼었다. 이 기록은 약자들의 연합이 겪은 비극과 재출발의 이야기이다."
+                ]
+            };
+
+            /* =========================
+               2. DOM & 캔버스 참조
+               ========================= */
+            const gameCanvas = document.getElementById('game');
+            const ctx = gameCanvas.getContext('2d');
+            const miniCanvas = document.getElementById('miniMap');
+            const miniCtx = miniCanvas.getContext('2d');
+
+            const overlay = document.getElementById('overlay');
+            const overlayPanel = document.getElementById('overlayPanel');
+            const codexOverlay = document.getElementById('codexOverlay');
+            const codexPanel = document.getElementById('codexPanel');
+
+            const codexBtn = document.getElementById('codexBtn');
+            const homeBtn = document.getElementById('homeBtn');
+            const freshStartBtn = document.getElementById('freshStartBtn');
+
+            const levelText = document.getElementById('levelText');
+            const itemKeyEl = document.getElementById('itemKeyEl');
+            const itemCompassEl = document.getElementById('itemCompassEl');
+
+            /* =========================
+               3. 전역 상태 (STATE)
+               ========================= */
+            let tileSize = 30;
+            let rows = 21, cols = 21;
+            let maze = []; // 1=wall,0=path,2=goal
+            let revealMap = [];
+            let visitedMap = [];
+            let items = []; // {x,y,type,collected,storyId,message}
+            let level = 1;
+            let player = { x: 1.5, y: 1.5, size: 0.65, vx: 0, vy: 0 };
+            let speed = 4.2; // tiles/sec
+            let lastTime = performance.now();
+            let goal = { x: cols - 2, y: rows - 2 };
+            let startTime = 0;
+            let timeLimitSeconds = 90;
+            let timeUp = false;
+            let hasKey = false;
+            // let levelCleared = false;
+            // let collectedStories = {}; // keys are note ids
+            // let hasNoteInCurrentLevel = false; // ⚠️ 추가: 현재 레벨에서 쪽지 획득 여부
+            // let levelCleared = false;
+            // let collectedStories = {}; // keys are note ids
+            // let currentLevelNoteId = null; // ⚠️ 추가: 현재 레벨에 배치된 쪽지 ID
+            let hasNoteInCurrentLevel = false;
+            let levelCleared = false;
+            let collectedStories = {};
+            let noteIdPlaced = null; // ⚠️ 수정: 현재 레벨에 '배치'된 쪽지 ID
+            let tempCollectedNoteId = null; // ⚠️ 신규 추가: 이번 레벨에서 '임시로 획득'한 쪽지 ID (레벨 클리어 시에만 영구 저장)
+
+            /* =========================
+               4. 이미지 로드
+               ========================= */
+            const blockImages = {};
+            const itemImages = { "note": new Image(), "key": new Image() };
+
+            itemImages["note"].src = "img/item/Letter.png";
+            itemImages["key"].src = "img/item/Bread.png";
+
+            const BLOCK_KEYS = ["1x1", "1x2", "1x3", "2x1", "3x1"];
+            BLOCK_KEYS.forEach(key => blockImages[key] = new Image());
+
+
+            /* =========================
+               5. 저장소 관리 (Local/Session Storage)
+               ========================= */
+            function loadStories() {
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    collectedStories = raw ? (JSON.parse(raw) || {}) : {};
+                } catch (e) {
+                    console.warn('loadStories error', e);
+                    collectedStories = {};
+                }
+            }
+            function saveStories() {
+                try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collectedStories)); } catch (e) { console.warn('saveStories', e); }
+            }
+
+            const resetCollectedStories = () => {
+                collectedStories = {};
+                saveStories();
+            };
+
+
+            /* =========================
+               6. 유틸리티 (Utils)
+               ========================= */
+            function inBounds(x, y) { return y >= 0 && y < maze.length && x >= 0 && x < maze[0].length; }
+            function randInt(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+            function dist(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
+            function getTimeLimitForLevel(lv) {
+                if (lv <= 1) return 90;
+                if (lv === 2) return 120;
+                if (lv === 3) return 150;
+                return 150 + (lv - 3) * 30;
+            }
+
+            /* =========================
+               7. HUD / UI (토스트, 업데이트)
+               ========================= */
+            function updateHud() {
+                levelText.textContent = level;
+
+                // ⚠️ 수정: HUD는 이제 현재 레벨의 획득 상태를 반영합니다.
+                // Key 이미지 (빵): 현재 레벨에서 획득했는지 여부에 따라 empty/full 변경
+                itemKeyEl.src = hasKey
+                    ? "img/item/Bread.png"
+                    : "img/item/Bread_empty.png";
+
+                // Note 이미지 (편지): 현재 레벨에서 쪽지를 획득했는지 여부에 따라 empty/full 변경
+                itemCompassEl.src = hasNoteInCurrentLevel
+                    ? "img/item/Letter.png"
+                    : "img/item/Letter_empty.png";
+            }
+            // function updateHud() {
+            //     levelText.textContent = level;
+            //     // Key 이미지 (빵)
+            //     itemKeyEl.src = collectedStories['key']
+            //         ? "img/item/Bread.png"
+            //         : "img/item/Bread_empty.png";
+            //     // Note 이미지 (편지)
+            //     const anyNote = ALL_NOTE_IDS.some(id => !!collectedStories[id]);
+            //     itemCompassEl.src = anyNote
+            //         ? "img/item/Letter.png"
+            //         : "img/item/Letter_empty.png";
+            // }
+
+            function showToast(text, ms = 1600) {
+                const t = document.createElement('div'); t.className = 'toast'; t.textContent = text;
+                document.body.appendChild(t);
+                setTimeout(() => { t.remove(); }, ms);
+            }
+
+            function showLoadingOverlay(message = '다음 레벨 로딩 중...') {
+                overlayPanel.innerHTML = '';
+                const box = document.createElement('div');
+                box.className = 'loading-box';
+                const spinner = document.createElement('div'); spinner.className = 'spinner';
+                const msg = document.createElement('div'); msg.className = 'loading-msg'; msg.textContent = message;
+                box.appendChild(spinner); box.appendChild(msg);
+                overlayPanel.appendChild(box);
+                overlay.style.display = 'flex';
+            }
+            function hideOverlay() { overlay.style.display = 'none'; overlayPanel.innerHTML = ''; }
+
+            /* =========================
+               8. 미로 생성 & 아이템 배치
+               ========================= */
+            function createEmptyMaze(w, h) {
+                const m = [];
+                for (let y = 0; y < h; y++) { m[y] = []; for (let x = 0; x < w; x++) m[y][x] = 1; }
+                return m;
+            }
+            function generateMaze(w, h) {
+                cols = w; rows = h;
+                maze = createEmptyMaze(cols, rows);
+                const stack = [];
+                maze[1][1] = 0;
+                stack.push({ x: 1, y: 1 });
+                const deltas = [[0, -2], [2, 0], [0, 2], [-2, 0]];
+                while (stack.length) {
+                    const cur = stack[stack.length - 1];
+                    let neighbors = [];
+                    for (const d of deltas) {
+                        const nx = cur.x + d[0], ny = cur.y + d[1];
+                        if (inBounds(nx, ny) && maze[ny][nx] === 1) neighbors.push(d);
+                    }
+                    if (neighbors.length === 0) { stack.pop(); continue; }
+                    const ch = neighbors[Math.floor(Math.random() * neighbors.length)];
+                    const betweenX = cur.x + ch[0] / 2;
+                    const betweenY = cur.y + ch[1] / 2;
+                    const nx = cur.x + ch[0];
+                    const ny = cur.y + ch[1];
+                    maze[betweenY][betweenX] = 0;
+                    maze[ny][nx] = 0;
+                    stack.push({ x: nx, y: ny });
+                }
+
+                let possibleGoals = [];
+                for (let x = 1; x < cols - 1; x++) { if (maze[1][x] === 0) possibleGoals.push({ x, y: 0 }); }
+                for (let x = 1; x < cols - 1; x++) { if (maze[rows - 2][x] === 0) possibleGoals.push({ x, y: rows - 1 }); }
+                for (let y = 1; y < rows - 1; y++) { if (maze[y][1] === 0) possibleGoals.push({ x: 0, y }); }
+                for (let y = 1; y < rows - 1; y++) { if (maze[y][cols - 2] === 0) possibleGoals.push({ x: cols - 1, y }); }
+                if (possibleGoals.length === 0) possibleGoals.push({ x: cols - 2, y: rows - 2 });
+                goal = possibleGoals[Math.floor(Math.random() * possibleGoals.length)];
+                maze[goal.y][goal.x] = 2;
+
+                revealMap = Array.from({ length: rows }, () => Array(cols).fill(false));
+                visitedMap = Array.from({ length: rows }, () => Array(cols).fill(false));
+            }
+
+            function findRandomPathCell(avoidNearStart = true) {
+                for (let tries = 0; tries < 5000; tries++) {
+                    const x = randInt(1, cols - 2);
+                    const y = randInt(1, rows - 2);
+                    if (maze[y][x] !== 0) continue;
+                    if (avoidNearStart) {
+                        if (Math.abs(x - 1) + Math.abs(y - 1) < 4) continue;
+                        if (Math.abs(x - goal.x) + Math.abs(y - goal.y) < 4) continue;
+                    }
+                    return { x, y };
+                }
+                for (let y = 1; y < rows - 1; y++) for (let x = 1; x < cols - 1; x++) if (maze[y][x] === 0) return { x, y };
+                return { x: 1, y: 1 };
+            }
+
+            // function placeItemsForLevel(lv) {
+            //     items = [];
+            //     // always place key
+            //     const k = findRandomPathCell(true);
+            //     items.push({ type: 'key', x: k.x, y: k.y, collected: false, storyId: 'key' });
+
+            //     // determine note to spawn according to spawnOrder and spawnIndex
+            //     const spawnOrder = ensureSpawnOrder();
+            //     const spawnIndex = getSpawnIndex();
+            //     let noteId = null;
+            //     if (spawnIndex < spawnOrder.length) noteId = spawnOrder[spawnIndex];
+            //     // fallback: pick any uncollected
+            //     if (!noteId) {
+            //         const uncollected = ALL_NOTE_IDS.filter(id => !collectedStories[id]);
+            //         noteId = uncollected.length ? uncollected[Math.floor(Math.random() * uncollected.length)] : ALL_NOTE_IDS[Math.floor(Math.random() * ALL_NOTE_IDS.length)];
+            //     }
+
+            //     // place the note (one per level)
+            //     const p = findRandomPathCell(true);
+            //     items.push({ type: 'note', x: p.x, y: p.y, collected: false, storyId: noteId, message: storyTexts[noteId] || null });
+
+            //     // advance spawn index so next level uses next slot
+            //     incrementSpawnIndex();
+            // }
+            // function placeItemsForLevel(lv) {
+            //     items = [];
+            //     // 항상 키 아이템 배치
+            //     const k = findRandomPathCell(true);
+            //     items.push({ type: 'key', x: k.x, y: k.y, collected: false, storyId: 'key' });
+
+            //     // 획득하지 않은 첫 번째 쪽지를 순서대로 찾기
+            //     const spawnOrder = ensureSpawnOrder();
+            //     let noteId = null;
+
+            //     // 1. spawnOrder를 순회하며 획득하지 않은 첫 쪽지 ID를 찾음
+            //     for (const id of spawnOrder) {
+            //         // id가 정의되어 있고 (null이 아니며) 아직 collectedStories에 없는 경우
+            //         if (id && !collectedStories[id]) {
+            //             noteId = id;
+            //             break;
+            //         }
+            //     }
+
+            //     // 폴백: 순서의 모든 쪽지를 모았거나, 순서 외의 쪽지가 남아있을 경우
+            //     if (!noteId) {
+            //         const uncollected = ALL_NOTE_IDS.filter(id => !collectedStories[id]);
+            //         // 획득하지 않은 쪽지가 있으면 랜덤으로 배치
+            //         if (uncollected.length) {
+            //             noteId = uncollected[Math.floor(Math.random() * uncollected.length)];
+            //         } else {
+            //             // 모든 쪽지를 모았다면, 다시 가장 첫 번째 쪽지를 표시 (디버그/재확인용)
+            //             noteId = ALL_NOTE_IDS[0];
+            //         }
+            //     }
+
+            //     // 쪽지 배치
+            //     const p = findRandomPathCell(true);
+            //     items.push({ type: 'note', x: p.x, y: p.y, collected: false, storyId: noteId, message: storyTexts[noteId] || null });
+
+            //     // 이제 session index를 관리하는 함수 호출이 불필요합니다.
+            // }
+            // function placeItemsForLevel(lv) {
+            //     items = [];
+            //     // 항상 키 아이템 배치
+            //     const k = findRandomPathCell(true);
+            //     items.push({ type: 'key', x: k.x, y: k.y, collected: false, storyId: 'key' });
+
+            //     const spawnOrder = ensureSpawnOrder();
+            //     let noteIdToSpawn = null;
+
+            //     // 1. spawnOrder를 순회하며 획득하지 않은 첫 쪽지 ID를 찾음 (순서 보장)
+            //     for (const id of spawnOrder) {
+            //         if (id && !collectedStories[id]) {
+            //             noteIdToSpawn = id;
+            //             break;
+            //         }
+            //     }
+
+            //     // 2. 폴백 로직 (모두 모았거나 순서 외 쪽지가 남은 경우)
+            //     if (!noteIdToSpawn) {
+            //         const uncollected = ALL_NOTE_IDS.filter(id => !collectedStories[id]);
+            //         if (uncollected.length) {
+            //             noteIdToSpawn = uncollected[Math.floor(Math.random() * uncollected.length)];
+            //         } else {
+            //             noteIdToSpawn = ALL_NOTE_IDS[0];
+            //         }
+            //     }
+
+            //     // 쪽지 배치
+            //     currentLevelNoteId = noteIdToSpawn; // ⚠️ 현재 레벨 쪽지 ID 기록
+            //     const p = findRandomPathCell(true);
+            //     items.push({ type: 'note', x: p.x, y: p.y, collected: false, storyId: currentLevelNoteId, message: storyTexts[currentLevelNoteId] || null });
+            // }
+            function placeItemsForLevel(lv) {
+                items = [];
+                // 항상 키 아이템 배치
+                const k = findRandomPathCell(true);
+                items.push({ type: 'key', x: k.x, y: k.y, collected: false, storyId: 'key' });
+
+                const spawnOrder = ensureSpawnOrder();
+                let noteIdToSpawn = null;
+
+                // 획득하지 않은 첫 쪽지 ID를 찾음 (순서 보장)
+                for (const id of spawnOrder) {
+                    if (id && !collectedStories[id]) {
+                        noteIdToSpawn = id;
+                        break;
+                    }
+                }
+
+                // 폴백 로직
+                if (!noteIdToSpawn) {
+                    const uncollected = ALL_NOTE_IDS.filter(id => !collectedStories[id]);
+                    if (uncollected.length) {
+                        noteIdToSpawn = uncollected[Math.floor(Math.random() * uncollected.length)];
+                    } else {
+                        noteIdToSpawn = ALL_NOTE_IDS[0];
+                    }
+                }
+
+                // 쪽지 배치
+                noteIdPlaced = noteIdToSpawn; // ⚠️ 배치된 쪽지 ID 기록
+                tempCollectedNoteId = null; // ⚠️ 레벨 시작 시 임시 획득 ID 초기화 (핵심)
+                const p = findRandomPathCell(true);
+                items.push({ type: 'note', x: p.x, y: p.y, collected: false, storyId: noteIdPlaced, message: storyTexts[noteIdPlaced] || null });
+            }
+
+
+            /* =========================
+               9. 스폰 순서 관리 (Session)
+               ========================= */
+            function buildDefaultSpawnOrder() {
+                const order = new Array(15).fill(null);
+                order[0] = 'siblings_1'; order[1] = 'siblings_2'; order[2] = 'siblings_3';
+                order[3] = 'maid_1'; order[4] = 'maid_2'; order[5] = 'maid_3';
+                order[12] = 'sibling_younger_1'; order[13] = 'sibling_younger_2'; order[14] = 'sibling_younger_3';
+
+                const used = new Set(order.filter(Boolean));
+                const remaining = ALL_NOTE_IDS.filter(id => !used.has(id));
+                for (let i = remaining.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+                }
+
+                let idx = 0;
+                for (let pos = 6; pos <= 11; pos++) {
+                    order[pos] = remaining[idx++] || null;
+                }
+                for (let i = 0; i < order.length; i++) if (!order[i] && idx < remaining.length) order[i] = remaining[idx++];
+
+                return order;
+            }
+
+            function ensureSpawnOrder() {
+                try {
+                    const raw = sessionStorage.getItem(SPAWN_KEY);
+                    if (raw) {
+                        const arr = JSON.parse(raw);
+                        if (Array.isArray(arr) && arr.length >= 15) return arr.slice(0, 15);
+                    }
+                } catch (e) { /* ignore parse errors */ }
+
+                const built = buildDefaultSpawnOrder();
+                try { sessionStorage.setItem(SPAWN_KEY, JSON.stringify(built)); } catch (e) { }
+                return built;
+            }
+
+            // function getSpawnIndex() {
+            //     try {
+            //         const raw = sessionStorage.getItem(SPAWN_INDEX_KEY);
+            //         const n = raw ? parseInt(raw, 10) : 0;
+            //         return Number.isFinite(n) ? Math.max(0, n) : 0;
+            //     } catch (e) { return 0; }
+            // }
+            // function incrementSpawnIndex() {
+            //     try {
+            //         let n = getSpawnIndex();
+            //         n = Math.min(n + 1, 1000);
+            //         sessionStorage.setItem(SPAWN_INDEX_KEY, String(n));
+            //     } catch (e) { }
+            // }
+            function resetSpawnSession() {
+                try {
+                    sessionStorage.removeItem(SPAWN_KEY);
+                    sessionStorage.removeItem(SPAWN_INDEX_KEY);
+                } catch (e) { }
+            }
+
+            /* =========================
+               10. 충돌 & 수집 판정
+               ========================= */
+            function canMoveToPos(x, y) {
+                const half = player.size / 2;
+                const corners = [
+                    { x: x - half, y: y - half }, { x: x + half, y: y - half },
+                    { x: x - half, y: y + half }, { x: x + half, y: y + half }
+                ];
+                for (const c of corners) {
+                    const tx = Math.floor(c.x);
+                    const ty = Math.floor(c.y);
+                    if (!inBounds(tx, ty) || !maze[ty] || maze[ty][tx] === undefined || maze[ty][tx] === 1) return false;
+                }
+                return true;
+            }
+
+            // function tryCollectItems() {
+            //     for (let i = items.length - 1; i >= 0; i--) {
+            //         const it = items[i];
+            //         if (!it) continue;
+            //         const d = dist(player.x, player.y, it.x + 0.5, it.y + 0.5);
+            //         if (d < 0.8) {
+            //             it.collected = true;
+            //             items.splice(i, 1);
+            //             if (it.type === 'key') {
+            //                 hasKey = true;
+            //                 unlockNote('key');
+            //                 showStoryOverlay('열쇠 획득', storyTexts.key[0], 2000);
+            //             } else if (it.type === 'note') {
+            //                 const nid = it.storyId;
+            //                 unlockNote(nid);
+            //                 const content = collectedStories[nid] && collectedStories[nid].text ? collectedStories[nid].text : storyTexts[nid];
+            //                 showStoryOverlay('쪽지', content, 0);
+            //             } else {
+            //                 if (it.storyId) { unlockNote(it.storyId); showStoryOverlay('쪽지', storyTexts[it.storyId] || it.message || '(내용 없음)', 0); }
+            //                 else showToast('아이템 획득');
+            //             }
+            //             updateHud();
+            //         }
+            //     }
+            // }
+            // function tryCollectItems() {
+            //     for (let i = items.length - 1; i >= 0; i--) {
+            //         const it = items[i];
+            //         if (!it) continue;
+            //         const d = dist(player.x, player.y, it.x + 0.5, it.y + 0.5);
+            //         if (d < 0.8) {
+            //             it.collected = true;
+            //             items.splice(i, 1);
+            //             if (it.type === 'key') {
+            //                 hasKey = true;
+            //                 unlockNote('key');
+            //                 showStoryOverlay('열쇠 획득', storyTexts.key[0], 2000);
+            //             } else if (it.type === 'note') {
+            //                 const nid = it.storyId;
+            //                 unlockNote(nid);
+            //                 hasNoteInCurrentLevel = true; // ⚠️ 현재 레벨 쪽지 획득 상태 갱신
+            //                 const content = collectedStories[nid] && collectedStories[nid].text ? collectedStories[nid].text : storyTexts[nid];
+            //                 showStoryOverlay('쪽지', content, 0);
+            //             } else {
+            //                 if (it.storyId) {
+            //                     unlockNote(it.storyId);
+            //                     hasNoteInCurrentLevel = true; // ⚠️ 현재 레벨 쪽지 획득 상태 갱신
+            //                     showStoryOverlay('쪽지', storyTexts[it.storyId] || it.message || '(내용 없음)', 0);
+            //                 }
+            //                 else showToast('아이템 획득');
+            //             }
+            //             updateHud();
+            //         }
+            //     }
+            // }
+            function tryCollectItems() {
+                for (let i = items.length - 1; i >= 0; i--) {
+                    const it = items[i];
+                    if (!it) continue;
+                    const d = dist(player.x, player.y, it.x + 0.5, it.y + 0.5);
+                    if (d < 0.8) {
+                        it.collected = true;
+                        items.splice(i, 1);
+                        if (it.type === 'key') {
+                            hasKey = true;
+                            unlockNote('key'); // 키는 즉시 영구 저장 유지
+                            showStoryOverlay('열쇠 획득', storyTexts.key[0], 2000);
+                        } else if (it.type === 'note') {
+                            const nid = it.storyId;
+                            // unlockNote(nid); // ⚠️ 영구 저장 로직 제거!
+                            tempCollectedNoteId = nid; // ⚠️ 쪽지 ID를 임시 저장
+                            hasNoteInCurrentLevel = true;
+                            const content = collectedStories[nid] && collectedStories[nid].text ? collectedStories[nid].text : storyTexts[nid];
+                            showStoryOverlay('쪽지', content, 0);
+                        } else {
+                            if (it.storyId) {
+                                // ... (other item logic)
+                            }
+                            else showToast('아이템 획득');
+                        }
+                        updateHud();
+                    }
+                }
+            }
+
+            /* =========================
+             11. 목표 도달 확인 (Check Goal)
+             ========================= */
+            function checkGoal() {
+                const px = Math.floor(player.x);
+                const py = Math.floor(player.y);
+
+                // 목표 지점 (Exit)에 도달했는지 확인
+                // 기존 목표 지점 확인 로직 (거리 기반 d < 0.8) 대신 타일 좌표 기반 로직으로 변경하여 통일성을 유지합니다.
+                // 다만, 제공하신 코드에는 dist를 사용하므로, 그대로 dist 로직을 사용하겠습니다.
+
+                const d = dist(player.x, player.y, goal.x + 0.5, goal.y + 0.5);
+
+                if (d < 0.8 && !levelCleared) {
+                    if (hasKey) {
+                        // ⚠️ 기존 레벨 클리어 로직을 신규 함수 호출로 대체 (쪽지 저장 버그 해결 핵심)
+                        completeLevelAndProgress();
+                        // completeLevelAndProgress 함수 내에서 levelCleared = true 설정 및 다음 레벨 로딩을 처리합니다.
+                    } else {
+                        showToast("아이템이 부족합니다! 물자를 모아야 합니다.", 1800);
+                    }
+                }
+            }
+            // function checkGoal() {
+            //     const d = dist(player.x, player.y, goal.x + 0.5, goal.y + 0.5);
+            //     if (d < 0.8 && !levelCleared) {
+            //         if (hasKey) {
+            //             levelCleared = true;
+            //             const nextLevel = level + 1; const MAX_LEVEL = 15;
+            //             if (level >= MAX_LEVEL) {
+            //                 showLoadingOverlay('엔딩을 준비 중입니다...');
+            //                 setTimeout(() => {
+            //                     hideOverlay();
+            //                     unlockNote('ending');
+            //                     showStoryOverlay('엔딩', storyTexts.ending[0], 0);
+            //                 }, 800);
+            //                 return;
+            //             }
+            //             showLoadingOverlay(`레벨 ${nextLevel} 로딩 중...`);
+            //             setTimeout(() => {
+            //                 level = nextLevel;
+            //                 startLevel(level);
+            //                 hideOverlay();
+            //                 levelCleared = false;
+            //                 lastTime = performance.now();
+            //             }, 700);
+            //         } else {
+            //             showToast("아이템이 부족합니다! 물자를 모아야 합니다.", 1800);
+            //         }
+            //     }
+            // }
+
+            /* =========================
+               11. 시야 & 미니맵
+               ========================= */
+            let revealRadius = 3;
+            function revealAround(px, py) {
+                const cx = Math.floor(px), cy = Math.floor(py);
+                for (let dy = -revealRadius; dy <= revealRadius; dy++) {
+                    for (let dx = -revealRadius; dx <= revealRadius; dx++) {
+                        const x = cx + dx, y = cy + dy;
+                        if (inBounds(x, y)) revealMap[y][x] = true;
+                    }
+                }
+                if (inBounds(cx, cy) && maze[cy][cx] === 0) visitedMap[cy][cx] = true;
+            }
+
+            function drawMiniMap() {
+                const w = miniCanvas.width, h = miniCanvas.height;
+                miniCtx.clearRect(0, 0, w, h);
+                const cellW = w / cols, cellH = h / rows;
+
+                miniCtx.fillStyle = '#030303'; miniCtx.fillRect(0, 0, w, h);
+
+                for (let y = 0; y < rows; y++) {
+                    if (!visitedMap[y] || !maze[y]) continue;
+                    for (let x = 0; x < cols; x++) {
+                        if (visitedMap[y][x] && maze[y][x] === 0) {
+                            miniCtx.fillStyle = '#bfbfbf';
+                            miniCtx.fillRect(x * cellW, y * cellH, cellW, cellH);
+                        }
+                    }
+                }
+                // Goal
+                miniCtx.fillStyle = '#2ecc71'; miniCtx.fillRect(goal.x * cellW + cellW * 0.15, goal.y * cellH + cellH * 0.15, cellW * 0.7, cellH * 0.7);
+                // Items
+                for (const it of items) {
+                    if (visitedMap[it.y] && visitedMap[it.y][it.x]) {
+                        miniCtx.beginPath();
+                        miniCtx.fillStyle = (it.type === 'key') ? '#ffcc00' : '#7f5cff';
+                        miniCtx.arc((it.x + 0.5) * cellW, (it.y + 0.5) * cellH, Math.min(cellW, cellH) * 0.25, 0, Math.PI * 2);
+                        miniCtx.fill();
+                    }
+                }
+                // Player
+                miniCtx.fillStyle = '#ff4b4b';
+                miniCtx.beginPath();
+                miniCtx.arc((player.x) * cellW, (player.y) * cellH, Math.min(cellW, cellH) * 0.32, 0, Math.PI * 2);
+                miniCtx.fill();
+            }
+
+            /* =========================
+               12. 도감 / 스토리
+               ========================= */
+            function unlockNote(id) {
+                if (!collectedStories[id]) {
+                    const txt = storyTexts[id] || '(기록 없음)';
+                    collectedStories[id] = { unlocked: true, text: txt };
+                    saveStories();
+                }
+            }
+            function showStoryOverlay(title, text, autoCloseMs = 3000) {
+                overlayPanel.innerHTML = '';
+                const h = document.createElement('h3'); h.style.margin = '0 0 6px'; h.textContent = title || '상세';
+                overlayPanel.appendChild(h);
+                let content = Array.isArray(text) ? text.join('\n\n') : String(text || '');
+                if (content) {
+                    const p = document.createElement('pre'); p.className = 'story'; p.textContent = content;
+                    overlayPanel.appendChild(p);
+                }
+                const actions = document.createElement('div'); actions.className = 'actions';
+                const closeBtn = document.createElement('button'); closeBtn.className = 'primary'; closeBtn.textContent = '닫기';
+                closeBtn.onclick = () => { overlay.style.display = 'none'; };
+                actions.appendChild(closeBtn);
+                overlayPanel.appendChild(actions);
+                overlay.style.display = 'flex';
+                if (autoCloseMs && autoCloseMs > 0) {
+                    setTimeout(() => { if (overlay.style.display === 'flex') overlay.style.display = 'none'; }, autoCloseMs);
+                }
+            }
+            /* =========================
+               그룹 뷰 (획득된 쪽지 합쳐서 보기)
+               ========================= */
+
+            // 쪽지 전체 획득 시 완성된 스토리 표시 로직 (수정 및 전체 스토리 보기 버튼 추가)
+            function showGroupOverlay(group) {
+                const parts = group.parts;
+                const collectedParts = parts.filter(pid => !!collectedStories[pid]);
+                const collectedCount = collectedParts.length;
+                const total = parts.length;
+                const gotAll = collectedCount === total;
+                const fullStoryId = group.fullStoryId;
+                const fullStoryText = fullStoryId ? storyTexts[fullStoryId] : null; // 장문 스토리 텍스트
+
+                if (collectedCount === 0) {
+                    showToast('획득한 쪽지가 없습니다.');
+                    return;
+                }
+
+                let storyContentHtml = '';
+
+                if (gotAll) {
+                    // 모든 쪽지를 모았을 경우, 합쳐진 스토리 완성 (사용자 요청 포맷 적용)
+                    storyContentHtml += '<div style="margin-bottom: 15px; font-weight: bold; color: #ffeb3b;">스토리 완성!</div>';
+                    parts.forEach((pid, index) => {
+                        const txt = collectedStories[pid].text || storyTexts[pid];
+                        let content = Array.isArray(txt) ? txt.join('\n\n') : String(txt || '');
+                        // title formatting: siblings_1 -> Siblings 1
+                        const titleParts = pid.split('_');
+                        const title = titleParts.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+                        storyContentHtml += `<div style="font-size: 1.1em; margin-bottom: 4px; color: #9be6ff;">-- Part ${index + 1}: ${title} --</div>`;
+                        storyContentHtml += `<pre class="story">${content}</pre>`;
+                    });
+                } else {
+                    // 모든 쪽지를 모으지 못했을 경우, 획득한 쪽지만 보여줌
+                    storyContentHtml += '<div style="margin-bottom: 10px; opacity: 0.8;">(일부 획득)</div>';
+                    collectedParts.forEach((pid, index) => {
+                        const txt = collectedStories[pid].text || storyTexts[pid];
+                        let content = Array.isArray(txt) ? txt.join('\n\n') : String(txt || '');
+                        const titleParts = pid.split('_');
+                        const title = titleParts.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                        storyContentHtml += `<div style="font-size: 1.1em; margin-bottom: 4px; color: #9be6ff;">-- Part ${index + 1}: ${title} --</div>`;
+                        storyContentHtml += `<pre class="story">${content}</pre>`;
+                    });
+                }
+
+                overlayPanel.innerHTML = '';
+                const h = document.createElement('h3'); h.style.margin = '0 0 8px'; h.textContent = group.label;
+                overlayPanel.appendChild(h);
+
+                const noteContainer = document.createElement('div');
+                noteContainer.innerHTML = storyContentHtml;
+                overlayPanel.appendChild(noteContainer);
+
+                // === 전체 스토리 보기 버튼 추가 ===
+                if (gotAll && fullStoryText) {
+                    const fullStoryBtn = document.createElement('button');
+                    fullStoryBtn.className = 'primary';
+                    fullStoryBtn.textContent = '📖 전체 스토리 보기';
+                    fullStoryBtn.style.marginTop = '15px';
+                    fullStoryBtn.style.marginBottom = '8px';
+                    fullStoryBtn.style.width = '100%';
+                    fullStoryBtn.onclick = () => {
+                        // 현재 오버레이 닫고, 전체 스토리 오버레이 열기
+                        overlay.style.display = 'none';
+                        // showStoryOverlay를 이용해 장문의 전체 스토리를 표시
+                        showStoryOverlay(`[${group.label}] - 전체 스토리`, fullStoryText, 0);
+                    };
+                    overlayPanel.appendChild(fullStoryBtn);
+                }
+                // ==============================
+
+                const hint = document.createElement('p'); hint.style.opacity = '0.9'; hint.style.marginTop = '8px';
+                hint.textContent = gotAll
+                    ? `모든 쪽지를 모았습니다. 완성된 스토리가 해금되었습니다.`
+                    : `모은 쪽지: ${collectedCount}/${total}. 모든 쪽지를 모아야 완성된 스토리를 볼 수 있습니다.`;
+                overlayPanel.appendChild(hint);
+
+                const actions = document.createElement('div'); actions.className = 'actions';
+                // 닫기 버튼은 보조 색상(ghost)으로 변경하여 전체 스토리 보기 버튼을 강조
+                const closeBtn = document.createElement('button'); closeBtn.className = 'ghost'; closeBtn.textContent = '닫기';
+                closeBtn.onclick = () => { overlay.style.display = 'none'; };
+                actions.appendChild(closeBtn);
+                overlayPanel.appendChild(actions);
+                overlay.style.display = 'flex';
+            }
+            // function showGroupOverlay(group) {
+            //     const parts = group.parts;
+            //     const collectedParts = parts.filter(pid => !!collectedStories[pid]);
+            //     const collectedCount = collectedParts.length;
+            //     const total = parts.length;
+            //     const gotAll = collectedCount === total;
+
+            //     if (collectedCount === 0) {
+            //         showToast('획득한 쪽지가 없습니다.');
+            //         return;
+            //     }
+
+            //     let combined = [];
+            //     let storyContentHtml = '';
+
+            //     // 요청 1. 모든 쪽지를 모았을 경우, 합쳐진 스토리 완성
+            //     if (gotAll) {
+            //         combined = parts.map(pid => storyTexts[pid] || '');
+            //         storyContentHtml += '<div style="margin-bottom: 15px; font-weight: bold; color: #ffeb3b;">스토리 완성!</div>';
+            //         combined.flat().forEach((para, index) => {
+            //             const title = parts[index].split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            //             storyContentHtml += `<div style="font-size: 1.1em; margin-bottom: 4px; color: #9be6ff;">-- Part ${index + 1}: ${title} --</div>`;
+            //             storyContentHtml += `<pre class="story">${para}</pre>`;
+            //         });
+            //     } else {
+            //         // 모든 쪽지를 모으지 못했을 경우, 획득한 쪽지만 보여줌
+            //         storyContentHtml += '<div style="margin-bottom: 10px; opacity: 0.8;">(일부 획득)</div>';
+            //         collectedParts.forEach((pid) => {
+            //             const txt = collectedStories[pid].text || storyTexts[pid];
+            //             let content = Array.isArray(txt) ? txt.join('\n\n') : String(txt || '');
+            //             const titlePart = pid.split('_').pop();
+            //             storyContentHtml += `<div style="font-size: 1.1em; margin-bottom: 4px; color: #9be6ff;">-- Part: ${titlePart} --</div>`;
+            //             storyContentHtml += `<pre class="story">${content}</pre>`;
+            //         });
+            //     }
+
+            //     overlayPanel.innerHTML = '';
+            //     const h = document.createElement('h3'); h.style.margin = '0 0 8px'; h.textContent = group.label;
+            //     overlayPanel.appendChild(h);
+
+            //     const noteContainer = document.createElement('div');
+            //     noteContainer.innerHTML = storyContentHtml;
+            //     overlayPanel.appendChild(noteContainer);
+
+            //     const hint = document.createElement('p'); hint.style.opacity = '0.9'; hint.style.marginTop = '8px';
+            //     hint.textContent = gotAll ? `모든 쪽지를 모았습니다. 완성된 스토리가 해금되었습니다.` : `모은 쪽지: ${collectedCount}/${total}. 모든 쪽지를 모아야 완성된 스토리를 볼 수 있습니다.`;
+            //     overlayPanel.appendChild(hint);
+
+            //     const actions = document.createElement('div'); actions.className = 'actions';
+            //     const closeBtn = document.createElement('button'); closeBtn.className = 'primary'; closeBtn.textContent = '닫기';
+            //     closeBtn.onclick = () => { overlay.style.display = 'none'; };
+            //     actions.appendChild(closeBtn);
+            //     overlayPanel.appendChild(actions);
+            //     overlay.style.display = 'flex';
+            // }
+
+            // function showGroupOverlay(group) {
+            //     const parts = group.parts;
+            //     const collectedParts = parts.filter(pid => !!collectedStories[pid]);
+            //     if (collectedParts.length === 0) {
+            //         showToast('획득한 쪽지가 없습니다.');
+            //         return;
+            //     }
+
+            //     let combined = [];
+            //     for (const pid of parts) {
+            //         if (collectedStories[pid]) {
+            //             const t = collectedStories[pid].text || storyTexts[pid] || '';
+            //             if (Array.isArray(t)) combined = combined.concat(t);
+            //             else combined.push(String(t));
+            //         }
+            //     }
+
+            //     const gotAll = collectedParts.length === parts.length;
+            //     overlayPanel.innerHTML = '';
+            //     const h = document.createElement('h3'); h.style.margin = '0 0 8px'; h.textContent = group.label;
+            //     overlayPanel.appendChild(h);
+
+            //     const noteContainer = document.createElement('div');
+            //     combined.forEach((para) => {
+            //         const p = document.createElement('pre'); p.className = 'story'; p.textContent = para;
+            //         noteContainer.appendChild(p);
+            //     });
+            //     overlayPanel.appendChild(noteContainer);
+
+            //     const hint = document.createElement('p'); hint.style.opacity = '0.9'; hint.style.marginTop = '8px';
+            //     hint.textContent = gotAll ? `모든 쪽지를 모았습니다. 전체 스토리가 해금되었습니다.` : `모은 쪽지: ${collectedParts.length}/${parts.length}. 모든 쪽지를 모으면 관련 스토리가 완전히 해금됩니다.`;
+            //     overlayPanel.appendChild(hint);
+
+            //     const actions = document.createElement('div'); actions.className = 'actions';
+            //     const closeBtn = document.createElement('button'); closeBtn.className = 'primary'; closeBtn.textContent = '닫기';
+            //     closeBtn.onclick = () => { overlay.style.display = 'none'; };
+            //     actions.appendChild(closeBtn);
+            //     overlayPanel.appendChild(actions);
+            //     overlay.style.display = 'flex';
+            // }
+
+            function openCodex() {
+                codexPanel.innerHTML = '<h3 style="margin-top:0">스토리 도감</h3>';
+                storyGroups.forEach(g => {
+                    const parts = g.parts;
+                    const collectedCount = parts.filter(pid => !!collectedStories[pid]).length;
+                    const total = parts.length;
+                    const row = document.createElement('div'); row.className = 'group';
+                    const meta = document.createElement('div'); meta.className = 'meta';
+                    const title = document.createElement('div'); title.className = 'title'; title.textContent = g.label;
+                    const count = document.createElement('div'); count.className = 'count'; count.textContent = `${collectedCount}/${total}`;
+                    meta.appendChild(title); meta.appendChild(count);
+                    row.appendChild(meta);
+
+                    const preview = document.createElement('div'); preview.style.marginTop = '6px'; preview.style.opacity = '0.9';
+                    if (collectedCount === 0) {
+                        preview.textContent = '잠금 — 아직 획득한 쪽지가 없습니다.';
+                    } else {
+                        const firstCollectedId = parts.find(pid => !!collectedStories[pid]);
+                        let excerpt = '';
+                        const txt = (collectedStories[firstCollectedId] && collectedStories[firstCollectedId].text) || storyTexts[firstCollectedId];
+                        if (Array.isArray(txt)) excerpt = txt[0].slice(0, 80) + (txt[0].length > 80 ? '...' : '');
+                        else excerpt = String(txt).slice(0, 80) + (String(txt).length > 80 ? '...' : '');
+                        preview.textContent = excerpt;
+                    }
+                    row.appendChild(preview);
+
+                    row.onclick = () => {
+                        const collectedCountNow = parts.filter(pid => !!collectedStories[pid]).length;
+                        if (collectedCountNow === 0) {
+                            showToast('획득한 쪽지가 없습니다.');
+                            return;
+                        }
+                        showGroupOverlay(g);
+                        codexOverlay.style.display = 'none';
+                    };
+
+                    codexPanel.appendChild(row);
+                });
+
+                const close = document.createElement('div');
+                close.style.marginTop = '8px';
+                close.innerHTML = `<div style="text-align:right"><button class="primary" id="codexClose">닫기</button></div>`;
+                codexPanel.appendChild(close);
+                codexOverlay.style.display = 'flex';
+                document.getElementById('codexClose').onclick = () => { codexOverlay.style.display = 'none'; };
+            }
+
+            /* =========================
+               13. 렌더링 (Draw)
+               ========================= */
+            function drawTimer(ctx, rem) {
+                const sec = Math.floor(rem);
+                const mm = Math.floor(sec / 60);
+                const ss = sec % 60;
+                const text = `${mm}:${String(ss).padStart(2, '0')}`;
+                ctx.save();
+                ctx.font = '18px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillStyle = rem <= 10 ? 'tomato' : '#fff';
+                ctx.fillText(`시간: ${text}`, 12, 14);
+                ctx.restore();
+            }
+
+            function drawUrgency(nowTs, rem) {
+                if (rem > 20) return;
+                const p = Math.max(0, Math.min(1, rem / 20));
+                const startR = Math.max(gameCanvas.width, gameCanvas.height) * 0.9;
+                const endR = Math.max(48, Math.min(gameCanvas.width, gameCanvas.height) * 0.12);
+                const radius = endR + (startR - endR) * p;
+                const pulseSpeed = 6 + (1 - p) * 18;
+                const pulseAmount = 1 + 0.06 * (1 - p) * Math.sin(nowTs / 1000 * pulseSpeed);
+                const drawR = radius * pulseAmount;
+                ctx.save();
+                ctx.fillStyle = `rgba(120,10,10,${0.22 + (1 - p) * 0.28})`;
+                ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                const cx = gameCanvas.width / 2;
+                const cy = gameCanvas.height / 2;
+                ctx.arc(cx, cy, drawR, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalCompositeOperation = 'source-over';
+                const strokeAlpha = Math.min(1, 0.8 - p * 0.5 + (1 - p) * 0.2);
+                ctx.beginPath();
+                ctx.arc(cx, cy, drawR, 0, Math.PI * 2);
+                ctx.lineWidth = Math.max(3, (1 - p) * 18);
+                ctx.strokeStyle = `rgba(255,80,80,${strokeAlpha})`;
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(cx, cy, drawR - (ctx.lineWidth * 0.6), 0, Math.PI * 2);
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = `rgba(255,200,200,${0.18 + (1 - p) * 0.25})`;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            function draw(nowTs) {
+                ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+                const offsetX = gameCanvas.width / 2 - player.x * tileSize;
+                const offsetY = gameCanvas.height / 2 - player.y * tileSize;
+                const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+
+                for (let y = 0; y < rows; y++) {
+                    if (!maze[y]) continue;
+                    for (let x = 0; x < cols; x++) {
+                        if (maze[y][x] === undefined) continue;
+                        if (maze[y][x] === 1 && !visited[y][x]) {
+                            // Optimized wall rendering
+                            let lenX = 1; while (x + lenX < cols && lenX < 3 && maze[y][x + lenX] === 1 && !visited[y][x + lenX]) lenX++;
+                            if (lenX > 1) {
+                                const img = blockImages[`1x${lenX}`] || blockImages["1x1"];
+                                ctx.drawImage(img, x * tileSize + offsetX, y * tileSize + offsetY, tileSize * lenX, tileSize);
+                                for (let i = 0; i < lenX; i++) visited[y][x + i] = true;
+                                continue;
+                            }
+
+                            let lenY = 1; while (y + lenY < rows && lenY < 3 && maze[y + lenY] && maze[y + lenY][x] === 1 && !visited[y + lenY][x]) lenY++;
+                            if (lenY > 1) {
+                                const img = blockImages[`${lenY}x1`] || blockImages["1x1"];
+                                ctx.drawImage(img, x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize * lenY);
+                                for (let i = 0; i < lenY; i++) visited[y + i][x] = true;
+                                continue;
+                            }
+
+                            ctx.drawImage(blockImages["1x1"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize);
+                            visited[y][x] = true;
+                        } else if (maze[y][x] === 0) {
+                            ctx.fillStyle = "white";
+                            ctx.fillRect(x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize);
+                        }
+                    }
+                }
+
+                // Goal
+                ctx.fillStyle = "green";
+                ctx.fillRect(goal.x * tileSize + offsetX, goal.y * tileSize + offsetY, tileSize, tileSize);
+
+                // Items
+                for (const it of items) {
+                    const img = itemImages[it.type];
+                    const size = tileSize * 0.8;
+                    const px = it.x * tileSize + tileSize / 2 - size / 2 + offsetX;
+                    const py = it.y * tileSize + tileSize / 2 - size / 2 + offsetY;
+                    if (img) ctx.drawImage(img, px, py, size, size);
+                }
+
+                // Player
+                const psize = tileSize * player.size;
+                ctx.fillStyle = "red";
+                ctx.fillRect(gameCanvas.width / 2 - psize / 2, gameCanvas.height / 2 - psize / 2, psize, psize);
+
+                const rem = getRemainingSeconds();
+                drawTimer(ctx, rem);
+                drawUrgency(nowTs, rem);
+            }
+
+            /* =========================
+               14. 시간/게임오버
+               ========================= */
+            function getRemainingSeconds() {
+                if (!startTime) return timeLimitSeconds;
+                const elapsed = (Date.now() - startTime) / 1000;
+                return Math.max(0, timeLimitSeconds - elapsed);
+            }
+            function handleTimeUp() {
+                if (timeUp) return;
+                timeUp = true;
+                const elapsedTotal = ((Date.now() - startTime) / 1000).toFixed(1);
+                showGameOverOverlay({ title: '시간 초과!', message: `플레이타임: ${elapsedTotal}초\n레벨을 다시 시작하시겠습니까?` });
+            }
+            function showGameOverOverlay({ title = '게임 오버', message = '' } = {}) {
+                overlayPanel.innerHTML = '';
+                const panel = document.createElement('div'); panel.className = 'panel';
+                const h3 = document.createElement('h3'); h3.textContent = title; panel.appendChild(h3);
+                if (message) { const p = document.createElement('p'); p.innerText = message; panel.appendChild(p); }
+                const actions = document.createElement('div'); actions.className = 'actions';
+                const restartBtn = document.createElement('button'); restartBtn.className = 'primary'; restartBtn.textContent = '다시 시작';
+                restartBtn.onclick = () => { overlay.style.display = 'none'; timeUp = false; startLevel(level); requestAnimationFrame(update); };
+                actions.appendChild(restartBtn);
+                const exitBtn = document.createElement('button'); exitBtn.className = 'ghost'; exitBtn.style.marginLeft = '8px'; exitBtn.textContent = '종료';
+                exitBtn.onclick = () => { overlay.style.display = 'none'; timeUp = false; if (typeof showIntroStart === 'function') showIntroStart(); };
+                actions.appendChild(exitBtn);
+                panel.appendChild(actions);
+                overlayPanel.appendChild(panel);
+                overlay.style.display = 'flex';
+            }
+            function checkTimeout() { if (timeUp) return; const rem = getRemainingSeconds(); if (rem <= 0) handleTimeUp(); }
+
+            /* =========================
+               15. 메인 루프 (Update)
+               ========================= */
+            const keys = {};
+            function update(now) {
+                try {
+                    const dt = Math.min(0.05, (now - lastTime) / 1000);
+                    lastTime = now;
+
+                    // 1. 입력 처리 (키보드)
+                    if (!joyActive) {
+                        let ix = 0, iy = 0;
+                        if (keys['arrowup'] || keys['w']) iy -= 1;
+                        if (keys['arrowdown'] || keys['s']) iy += 1;
+                        if (keys['arrowleft'] || keys['a']) ix -= 1;
+                        if (keys['arrowright'] || keys['d']) ix += 1;
+                        if (ix !== 0 || iy !== 0) {
+                            const len = Math.hypot(ix, iy) || 1;
+                            player.vx = (ix / len) * speed;
+                            player.vy = (iy / len) * speed;
+                        } else { player.vx = 0; player.vy = 0; }
+                    }
+
+                    // 2. 이동 및 충돌
+                    let nextX = player.x + player.vx * dt;
+                    let nextY = player.y + player.vy * dt;
+
+                    if (canMoveToPos(nextX, player.y)) { player.x = nextX; } else { player.vx = 0; }
+                    if (canMoveToPos(player.x, nextY)) { player.y = nextY; } else { player.vy = 0; }
+
+                    // 3. 게임 상태 업데이트
+                    checkTimeout();
+                    revealAround(player.x, player.y);
+                    tryCollectItems();
+                    checkGoal();
+
+                    // 4. 렌더링
+                    draw(now);
+                    drawMiniMap();
+
+                    requestAnimationFrame(update);
+                } catch (err) {
+                    console.error('게임 루프 에러:', err);
+                    lastTime = performance.now();
+                    requestAnimationFrame(update);
+                }
+            }
+
+            // 
+            /* =========================
+              16. 레벨 시작 & 인트로
+              ========================= */
+            function startLevel(lv) {
+                // ⚠️ 현재 레벨 아이템 획득 상태 초기화
+                hasKey = false;
+                hasNoteInCurrentLevel = false;
+
+                const PATHS = {
+                    ROAD: "img/c/tiles_road/",
+                    MART: "img/c/tiles_mart/",
+                    MANSION: "img/c/tiles_mansion/",
+                    RUINS: "img/c/tiles_ruins/",
+                    OUTSIDE: "img/c/tiles_outside/"
+                };
+
+                // 레벨 순서 정의 (Level 1부터 시작)
+                const TILE_SET_SEQUENCE = [
+                    null,          // 레벨 0 (미사용)
+                    PATHS.ROAD,    // 1: road
+                    PATHS.MART,    // 2: mart
+                    PATHS.ROAD,    // 3: road
+                    PATHS.MANSION, // 4: house (mansion)
+                    PATHS.ROAD,    // 5: road
+                    PATHS.RUINS,   // 6: forest (ruins)
+                    PATHS.RUINS,   // 7: forest
+                    PATHS.RUINS,   // 8: forest
+                    PATHS.RUINS,   // 9: forest
+                ];
+
+                const levelToLoad = lv || 1;
+
+                const basePath = TILE_SET_SEQUENCE[levelToLoad] || PATHS.RUINS;
+
+
+                const loadPromises = [];
+                for (const key in blockImages) {
+                    loadPromises.push(
+                        new Promise((resolve) => {
+                            const img = blockImages[key];
+                            img.onload = () => resolve();
+                            img.src = `${basePath}block_${key}.png`;
+                        })
+                    );
+                }
+
+                Promise.all(loadPromises).then(() => {
+                    level = levelToLoad;
+                    cols = 21 + (level - 1) * 2;
+                    rows = 21 + (level - 1) * 2;
+                    if (cols % 2 === 0) cols++; if (rows % 2 === 0) rows++;
+
+                    timeLimitSeconds = getTimeLimitForLevel(level);
+                    startTime = Date.now();
+                    timeUp = false;
+
+                    generateMaze(cols, rows);
+                    player.x = 1.5; player.y = 1.5; player.vx = 0; player.vy = 0;
+                    levelCleared = false;
+                    placeItemsForLevel(level);
+                    revealAround(player.x, player.y);
+                    updateHud();
+                });
+            }
+            // function startLevel(lv) {
+            //     hasKey = false;
+
+            //     // ⚠️ 수정: 레벨별 타일셋 경로를 사용자가 요청한 순서로 변경 (road, mart, road, house, road, forest...)
+            //     const PATHS = {
+            //         ROAD: "img/c/tiles_road/",
+            //         MART: "img/c/tiles_mart/",
+            //         MANSION: "img/c/tiles_mansion/", // 'house'로 간주
+            //         RUINS: "img/c/tiles_ruins/",     // 'forest'로 간주 (Level 6부터 반복 적용)
+            //         OUTSIDE: "img/c/tiles_outside/"
+            //     };
+
+            //     // 레벨 순서 정의 (Level 1부터 시작)
+            //     const TILE_SET_SEQUENCE = [
+            //         null,          // 레벨 0 (미사용)
+            //         PATHS.ROAD,    // 1: road
+            //         PATHS.MART,    // 2: mart
+            //         PATHS.ROAD,    // 3: road
+            //         PATHS.MANSION, // 4: house (mansion)
+            //         PATHS.ROAD,    // 5: road
+            //         PATHS.RUINS,   // 6: forest (ruins)
+            //         PATHS.RUINS,   // 7: forest
+            //         PATHS.RUINS,   // 8: forest
+            //         PATHS.RUINS,   // 9: forest
+            //     ];
+
+            //     const levelToLoad = lv || 1;
+
+            //     // TILE_SET_SEQUENCE에 정의된 레벨을 사용하거나, 없으면 RUINS를 기본값으로 사용
+            //     const basePath = TILE_SET_SEQUENCE[levelToLoad] || PATHS.RUINS;
+
+
+            //     const loadPromises = [];
+            //     for (const key in blockImages) {
+            //         loadPromises.push(
+            //             new Promise((resolve) => {
+            //                 const img = blockImages[key];
+            //                 img.onload = () => resolve();
+            //                 img.src = `${basePath}block_${key}.png`;
+            //             })
+            //         );
+            //     }
+
+            //     Promise.all(loadPromises).then(() => {
+            //         level = levelToLoad;
+            //         cols = 21 + (level - 1) * 2;
+            //         rows = 21 + (level - 1) * 2;
+            //         if (cols % 2 === 0) cols++; if (rows % 2 === 0) rows++;
+
+            //         timeLimitSeconds = getTimeLimitForLevel(level);
+            //         startTime = Date.now();
+            //         timeUp = false;
+
+            //         generateMaze(cols, rows);
+            //         player.x = 1.5; player.y = 1.5; player.vx = 0; player.vy = 0;
+            //         levelCleared = false;
+            //         placeItemsForLevel(level);
+            //         revealAround(player.x, player.y);
+            //         updateHud();
+            //     });
+            // }
+
+            const showIntroStart = () => {
+                overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3>
+                <p>깊은 미궁 속으로 발을 내딛었다. 시작 버튼을 눌러 탐험을 시작하세요.</p>
+                <div class="actions"><button class="primary" id="startBtn">게임 시작</button></div>`;
+                overlay.style.display = 'flex';
+                document.getElementById('startBtn').onclick = () => {
+                    overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>${storyTexts.intro[0]}</p>`;
+                    collectedStories['intro'] = { unlocked: true, text: storyTexts.intro[0] };
+                    saveStories();
+                    setTimeout(() => { overlay.style.display = 'none'; startLevel(1); requestAnimationFrame(update); }, 1200);
+                };
+            };
+
+            /* =========================
+              17. 레벨 클리어/진행
+              ========================= */
+            function completeLevelAndProgress() {
+                // 1. 쪽지 영구 저장 확인 (버그 해결 핵심!)
+                if (tempCollectedNoteId) {
+                    // 임시 획득한 쪽지를 영구 저장하고 로컬 스토리지에 반영
+                    unlockNote(tempCollectedNoteId);
+                    showToast(`쪽지 [${tempCollectedNoteId}]가 도감에 저장되었습니다.`);
+                    tempCollectedNoteId = null; // 초기화
+                }
+
+                // 2. 레벨 클리어 및 다음 레벨로 진행
+                levelCleared = true;
+                showStoryOverlay(`Level ${level} 클리어!`, storyTexts[`level${level}`] || ['미궁을 벗어났다.'], 1500);
+
+                // 3. 다음 레벨 시작
+                setTimeout(() => {
+                    if (level < 99) {
+                        startLevel(level + 1);
+                        requestAnimationFrame(update); // update loop 재시작
+                    } else {
+                        showStoryOverlay('엔딩', storyTexts.ending[0], 0);
+                    }
+                }, 1500);
+            }
+
+
+            /* =========================
+               18. 입력 / 조이스틱 초기화
+               ========================= */
+            const joystick = document.getElementById('joystick');
+            const stick = document.getElementById('stick');
+            let joyActive = false; let joyCenter = null;
+            function initJoyCenter() { const r = joystick.getBoundingClientRect(); joyCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+            initJoyCenter(); window.addEventListener('resize', initJoyCenter);
+            function setStickPos(dx, dy) { const max = (joystick.clientWidth / 2 - stick.clientWidth / 2 - 6); const tx = Math.max(-1, Math.min(1, dx)) * max; const ty = Math.max(-1, Math.min(1, dy)) * max; stick.style.transform = `translate(${tx}px, ${ty}px)`; }
+            function startJoy(x, y) { joyActive = true; initJoyCenter(); updateJoy(x, y); }
+            function updateJoy(x, y) { if (!joyActive || !joyCenter) return; let dx = x - joyCenter.x; let dy = y - joyCenter.y; const distv = Math.hypot(dx, dy); const max = joystick.clientWidth / 2; if (distv > max) { dx = dx / distv * max; dy = dy / distv * max; } const nx = dx / max, ny = dy / max; player.vx = nx * speed; player.vy = ny * speed; setStickPos(nx, ny); }
+            function endJoy() { joyActive = false; player.vx = 0; player.vy = 0; setStickPos(0, 0); }
+
+            function initInput() {
+                // Keyboard
+                window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+                window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+                // Joystick
+                joystick.addEventListener('touchstart', e => { e.preventDefault(); startJoy(e.touches[0].clientX, e.touches[0].clientY); });
+                joystick.addEventListener('touchmove', e => { e.preventDefault(); updateJoy(e.touches[0].clientX, e.touches[0].clientY); });
+                joystick.addEventListener('touchend', e => { e.preventDefault(); endJoy(); });
+                joystick.addEventListener('mousedown', e => { e.preventDefault(); startJoy(e.clientX, e.clientY); });
+                window.addEventListener('mousemove', e => { if (joyActive) updateJoy(e.clientX, e.clientY); });
+                window.addEventListener('mouseup', e => { if (joyActive) endJoy(); });
+            }
+
+            /* =========================
+               19. 이벤트 바인딩 (Buttons)
+               ========================= */
+            function initListeners() {
+                // Debug Reset Spawn Order
+                document.getElementById('resetSpawn').addEventListener('click', () => {
+                    resetSpawnSession();
+                    showToast('세션 스폰 순서 초기화 완료.');
+                });
+
+                // Codex open
+                codexBtn.addEventListener('click', () => { openCodex(); });
+
+                // Home button
+                homeBtn.addEventListener('click', () => { showIntroStart(); });
+
+                // Fresh start
+                freshStartBtn.addEventListener('click', () => {
+                    if (!confirm('정말 처음부터 시작하시겠습니까? (도감/획득한 쪽지 모두 초기화됩니다)')) return;
+                    resetCollectedStories();
+                    resetSpawnSession();
+                    updateHud();
+                    showToast('도감이 초기화되었습니다.');
+                    showIntroStart();
+                });
+            }
+
+            /* =========================
+               20. 초기 실행
+               ========================= */
+            loadStories();
+            initInput();
+            initListeners();
+            updateHud();
+
+            if (!collectedStories['intro']) {
+                showIntroStart();
+            } else {
+                startLevel(level);
+                requestAnimationFrame(update);
+            }
+
+            // Global Debug Access (유지)
+            window._GAME = {
+                getState: () => ({ level, rows, cols, maze, items, player, collectedStories }),
+                resetStories: () => { collectedStories = {}; saveStories(); alert('stories reset'); },
+                resetSpawnSession: () => { resetSpawnSession(); alert('spawn session reset'); }
+            };
+        })();
+    </script>
+</body>
+
+</html>

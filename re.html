@@ -87,6 +87,27 @@
             z-index: 9999;
             font-size: 12px;
         }
+
+        /* 간단 버튼 스타일 (CSS는 사용자가 덮어쓸 예정) */
+        .hud-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        .hud-actions button {
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 0;
+            cursor: pointer;
+            background: #2a2a2a;
+            color: #fff;
+        }
+
+        .hud-actions button.primary {
+            background: #3b82f6;
+        }
     </style>
 </head>
 
@@ -96,12 +117,37 @@
         <div id="hubmap">
             <div class="hud">
                 <div class="hubup">
+                    <div class="panel" id="levelPanel">
+                        레벨: <span id="levelText">1</span>
+                    </div>
+                    <div class="panel items" id="itemPanel">
+                        아이템:
+                        <img id="itemKeyEl" src="img/item/Bread_empty.png" alt="key" width="24" height="24">
+                        <img id="itemCompassEl" src="img/item/Letter_empty.png" alt="compass" width="24" height="24">
+                    </div>
+                </div>
+                <div class="panel hud-actions" style="align-items:center">
+                    <div>
+                        <button id="homeBtn">홈</button>
+                        <button id="freshStartBtn">처음부터 시작</button>
+                    </div>
+                    <div style="margin-left:auto">
+                        <button id="codexBtn">📖 도감</button>
+                    </div>
+                </div>
+                <!-- <div class="panel">
+                    <button id="codexBtn">📖 도감</button>
+                </div> -->
+            </div>
+
+            <!-- <div class="hud">
+                <div class="hubup">
                     <div class="panel" id="levelPanel">레벨: <span id="levelText">1</span></div>
                     <div class="panel items" id="itemPanel">아이템: <span id="itemKey">❌</span> <span
                             id="itemCompass">❌</span></div>
                 </div>
                 <div class="panel"><button id="codexBtn">📖 도감</button></div>
-            </div>
+            </div> -->
             <div id="miniWrapper"><canvas id="miniMap" width="260" height="260"></canvas></div>
         </div>
 
@@ -196,8 +242,11 @@
             const codexPanel = document.getElementById('codexPanel');
             const codexBtn = document.getElementById('codexBtn');
             const levelText = document.getElementById('levelText');
-            const itemKeyEl = document.getElementById('itemKey');
-            const itemCompassEl = document.getElementById('itemCompass');
+            const itemKeyEl = document.getElementById('itemKeyEl');
+            const itemCompassEl = document.getElementById('itemCompassEl');
+
+            const homeBtn = document.getElementById('homeBtn');
+            const freshStartBtn = document.getElementById('freshStartBtn');
 
             /* =========================
                전역 상태
@@ -225,19 +274,32 @@
                ========================= */
             const blockImages = {
                 "1x1": new Image(), "1x2": new Image(), "1x3": new Image(),
-                "2x1": new Image(), "2x2": new Image(), "2x3": new Image(),
-                "3x1": new Image(), "3x2": new Image(), "3x3": new Image()
+                "2x1": new Image(), // "2x2": new Image(), "2x3": new Image(),
+                "3x1": new Image(), // "3x2": new Image(), "3x3": new Image()
             };
             blockImages["1x1"].src = "img/block_1x1.png";
             blockImages["1x2"].src = "img/block_1x2.png";
             blockImages["1x3"].src = "img/block_1x3.png";
             blockImages["2x1"].src = "img/block_2x1.png";
-            blockImages["2x2"].src = "img/block_2x2.png";
-            blockImages["2x3"].src = "img/block_2x3.png";
+            // blockImages["2x2"].src = "img/block_2x2.png";
+            // blockImages["2x3"].src = "img/block_2x3.png";
             blockImages["3x1"].src = "img/block_3x1.png";
-            blockImages["3x2"].src = "img/block_3x2.png";
-            blockImages["3x3"].src = "img/block_3x3.png";
+            // blockImages["3x2"].src = "img/block_3x2.png";
+            // blockImages["3x3"].src = "img/block_3x3.png";
 
+            /* =========================
+               이미지 로드 (아이템)
+               ========================= */
+            const itemImages = {
+                "note": new Image(),
+                "key": new Image(),
+                // "other": loadImage("img/item/other.png") // 기타 아이템
+            };
+            // const itemImages = {
+            itemImages["note"].src = "img/item/Letter.png";
+            itemImages["key"].src = "img/item/Bread.png";
+            // "other": loadImage("img/item/other.png") // 기타 아이템
+            // };
             /* =========================
                저장(로컬스토리지) - 스토리 도감
                ========================= */
@@ -259,7 +321,10 @@
             /* =========================
                유틸
                ========================= */
-            function inBounds(x, y) { return x >= 0 && y >= 0 && x < cols && y < rows; }
+            function inBounds(x, y) {
+                return y >= 0 && y < maze.length && x >= 0 && x < maze[0].length;
+            }
+            // function inBounds(x, y) { return x >= 0 && y >= 0 && x < cols && y < rows; }
             function randInt(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
             function dist(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
 
@@ -467,13 +532,37 @@
                     { x: x - half, y: y + half },
                     { x: x + half, y: y + half }
                 ];
+
                 for (const c of corners) {
                     const tx = Math.floor(c.x);
                     const ty = Math.floor(c.y);
-                    if (!inBounds(tx, ty) || maze[ty][tx] === 1) return false;
+
+                    // 배열 범위 체크
+                    if (!inBounds(tx, ty)) return false;
+
+                    // maze[ty] 존재 여부 체크
+                    if (!maze[ty] || maze[ty][tx] === undefined) return false;
+
+                    // 벽이면 이동 불가
+                    if (maze[ty][tx] === 1) return false;
                 }
                 return true;
             }
+            // function canMoveToPos(x, y) {
+            //     const half = player.size / 2;
+            //     const corners = [
+            //         { x: x - half, y: y - half },
+            //         { x: x + half, y: y - half },
+            //         { x: x - half, y: y + half },
+            //         { x: x + half, y: y + half }
+            //     ];
+            //     for (const c of corners) {
+            //         const tx = Math.floor(c.x);
+            //         const ty = Math.floor(c.y);
+            //         if (!inBounds(tx, ty) || maze[ty][tx] === 1) return false;
+            //     }
+            //     return true;
+            // }
 
             /* =========================
                시야 & 미니맵 방문 처리
@@ -640,13 +729,35 @@
 
             /* =========================
                HUD / 토스트
-               ========================= */
+            //    ========================= */
+            // const itemKeyEl = document.getElementById("itemKeyEl");
+            // const itemCompassEl = document.getElementById("itemCompassEl");
+
             function updateHud() {
                 levelText.textContent = level;
-                itemKeyEl.textContent = collectedStories['key'] ? '🔑' : '❌';
+
+                // Bread 이미지 업데이트
+                itemKeyEl.src = collectedStories['key']
+                    ? "img/item/Bread.png"
+                    : "img/item/Bread_empty.png";
+
+                // Letter 이미지 업데이트
                 const anyNote = ALL_NOTE_IDS.some(id => !!collectedStories[id]);
-                itemCompassEl.textContent = anyNote ? '🧭' : '❌';
+                itemCompassEl.src = anyNote
+                    ? "img/item/Letter.png"
+                    : "img/item/Letter_empty.png";
+
+                const resetCollectedStories = () => {
+                    collectedStories = {};
+                    saveStories();
+                };
             }
+            // function updateHud() {
+            //     levelText.textContent = level;
+            //     itemKeyEl.textContent = collectedStories['key'] ? '🔑' : '❌';
+            //     const anyNote = ALL_NOTE_IDS.some(id => !!collectedStories[id]);
+            //     itemCompassEl.textContent = anyNote ? '🧭' : '❌';
+            // }
             function showToast(text, ms = 1600) {
                 const t = document.createElement('div'); t.className = 'toast'; t.textContent = text;
                 document.body.appendChild(t);
@@ -788,24 +899,31 @@
                 const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
 
                 for (let y = 0; y < rows; y++) {
+                    if (!maze[y]) continue;
                     for (let x = 0; x < cols; x++) {
+                        if (maze[y][x] === undefined) continue;
+
                         if (maze[y][x] === 1 && !visited[y][x]) {
                             let lenX = 1;
                             while (x + lenX < cols && lenX < 3 && maze[y][x + lenX] === 1 && !visited[y][x + lenX]) lenX++;
                             if (lenX > 1) {
-                                const type = `1x${lenX}`; const img = blockImages[type] || blockImages["1x1"];
+                                const type = `1x${lenX}`;
+                                const img = blockImages[type] || blockImages["1x1"];
                                 ctx.drawImage(img, x * tileSize + offsetX, y * tileSize + offsetY, tileSize * lenX, tileSize);
                                 for (let i = 0; i < lenX; i++) visited[y][x + i] = true;
                                 continue;
                             }
+
                             let lenY = 1;
-                            while (y + lenY < rows && lenY < 3 && maze[y + lenY][x] === 1 && !visited[y + lenY][x]) lenY++;
+                            while (y + lenY < rows && lenY < 3 && maze[y + lenY] && maze[y + lenY][x] === 1 && !visited[y + lenY][x]) lenY++;
                             if (lenY > 1) {
-                                const type = `${lenY}x1`; const img = blockImages[type] || blockImages["1x1"];
+                                const type = `${lenY}x1`;
+                                const img = blockImages[type] || blockImages["1x1"];
                                 ctx.drawImage(img, x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize * lenY);
                                 for (let i = 0; i < lenY; i++) visited[y + i][x] = true;
                                 continue;
                             }
+
                             ctx.drawImage(blockImages["1x1"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize);
                             visited[y][x] = true;
                         } else if (maze[y][x] === 0) {
@@ -815,16 +933,26 @@
                     }
                 }
 
+                // 목표
                 ctx.fillStyle = "green";
                 ctx.fillRect(goal.x * tileSize + offsetX, goal.y * tileSize + offsetY, tileSize, tileSize);
 
-                items.forEach(it => {
-                    ctx.fillStyle = it.type === "note" ? "#7f5cff" : (it.type === "key" ? "#ffcc00" : "purple");
-                    ctx.beginPath();
-                    ctx.arc(it.x * tileSize + tileSize / 2 + offsetX, it.y * tileSize + tileSize / 2 + offsetY, tileSize / 3, 0, Math.PI * 2);
-                    ctx.fill();
-                });
+                // 아이템
+                for (const it of items) {
+                    const img = itemImages[it.type] || itemImages["other"];
+                    const size = tileSize * 0.8; // 이미지 크기 (조정 가능)
+                    const px = it.x * tileSize + tileSize / 2 - size / 2 + offsetX;
+                    const py = it.y * tileSize + tileSize / 2 - size / 2 + offsetY;
+                    ctx.drawImage(img, px, py, size, size);
+                }
+                // for (const it of items) {
+                //     ctx.fillStyle = it.type === "note" ? "#7f5cff" : (it.type === "key" ? "#ffcc00" : "purple");
+                //     ctx.beginPath();
+                //     ctx.arc(it.x * tileSize + tileSize / 2 + offsetX, it.y * tileSize + tileSize / 2 + offsetY, tileSize / 3, 0, Math.PI * 2);
+                //     ctx.fill();
+                // }
 
+                // 플레이어
                 const psize = tileSize * player.size;
                 ctx.fillStyle = "red";
                 ctx.fillRect(gameCanvas.width / 2 - psize / 2, gameCanvas.height / 2 - psize / 2, psize, psize);
@@ -840,9 +968,12 @@
                 const w = miniCanvas.width, h = miniCanvas.height;
                 miniCtx.clearRect(0, 0, w, h);
                 const cellW = w / cols, cellH = h / rows;
+
                 miniCtx.fillStyle = '#030303';
                 miniCtx.fillRect(0, 0, w, h);
+
                 for (let y = 0; y < rows; y++) {
+                    if (!visitedMap[y] || !maze[y]) continue; // 안전 체크
                     for (let x = 0; x < cols; x++) {
                         if (visitedMap[y][x] && maze[y][x] === 0) {
                             miniCtx.fillStyle = '#bfbfbf';
@@ -850,8 +981,12 @@
                         }
                     }
                 }
+
+                // 목표 위치
                 miniCtx.fillStyle = '#2ecc71';
                 miniCtx.fillRect(goal.x * cellW + cellW * 0.15, goal.y * cellH + cellH * 0.15, cellW * 0.7, cellH * 0.7);
+
+                // 아이템
                 for (const it of items) {
                     if (visitedMap[it.y] && visitedMap[it.y][it.x]) {
                         miniCtx.beginPath();
@@ -860,11 +995,14 @@
                         miniCtx.fill();
                     }
                 }
+
+                // 플레이어
                 miniCtx.fillStyle = '#ff4b4b';
                 miniCtx.beginPath();
                 miniCtx.arc((player.x) * cellW, (player.y) * cellH, Math.min(cellW, cellH) * 0.32, 0, Math.PI * 2);
                 miniCtx.fill();
             }
+
 
             /* =========================
                입력 / 조이스틱
@@ -969,17 +1107,52 @@
                ========================= */
             function startLevel(lv) {
                 hasKey = false;
-                level = lv || 1;
-                cols = 21 + (level - 1) * 2; rows = 21 + (level - 1) * 2;
-                if (cols % 2 === 0) cols++; if (rows % 2 === 0) rows++;
-                timeLimitSeconds = getTimeLimitForLevel(level);
-                startTime = Date.now(); timeUp = false;
-                generateMaze(cols, rows);
-                player.x = 1.5; player.y = 1.5; player.vx = 0; player.vy = 0;
-                levelCleared = false;
-                placeItemsForLevel(level);
-                revealAround(player.x, player.y);
-                updateHud();
+
+                const tileSets = {
+                    1: "img/c/tiles_road/",
+                    2: "img/c/tiles_mart/",
+                    3: "img/c/tiles_mansion/",
+                    4: "img/c/tiles_outside/",
+                    5: "img/c/tiles_ruins/"
+                };
+
+                const levelToLoad = lv || 1;
+                const basePath = tileSets[levelToLoad] || "img/";
+
+                const loadPromises = [];
+                for (const key in blockImages) {
+                    loadPromises.push(
+                        new Promise((resolve) => {
+                            const img = new Image();
+                            img.onload = () => resolve();
+                            img.src = `${basePath}block_${key}.png`;
+                            blockImages[key] = img;
+                        })
+                    );
+                }
+
+                // ✅ 모든 이미지 로드 후 미로 생성
+                Promise.all(loadPromises).then(() => {
+                    level = levelToLoad;
+                    cols = 21 + (level - 1) * 2;
+                    rows = 21 + (level - 1) * 2;
+                    if (cols % 2 === 0) cols++;
+                    if (rows % 2 === 0) rows++;
+
+                    timeLimitSeconds = getTimeLimitForLevel(level);
+                    startTime = Date.now();
+                    timeUp = false;
+
+                    generateMaze(cols, rows);
+                    player.x = 1.5;
+                    player.y = 1.5;
+                    player.vx = 0;
+                    player.vy = 0;
+                    levelCleared = false;
+                    placeItemsForLevel(level);
+                    revealAround(player.x, player.y);
+                    updateHud();
+                });
             }
 
             /* =========================
@@ -998,7 +1171,25 @@
                 };
             };
 
+            // codexBtn.addEventListener('click', () => { openCodex(); });
+
+            // Codex open
             codexBtn.addEventListener('click', () => { openCodex(); });
+
+            // Home button: show intro overlay (does not reset)
+            homeBtn.addEventListener('click', () => {
+                showIntroStart();
+            });
+
+            // Fresh start: reset collected stories + session spawn, then show intro
+            freshStartBtn.addEventListener('click', () => {
+                if (!confirm('정말 처음부터 시작하시겠습니까? (도감/획득한 쪽지 모두 초기화됩니다)')) return;
+                resetCollectedStories();
+                resetSpawnSession();
+                updateHud();
+                showToast('도감이 초기화되었습니다.');
+                showIntroStart();
+            });
 
             window._GAME = {
                 getState: () => ({ level, rows, cols, maze, items, player, collectedStories }),
