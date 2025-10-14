@@ -272,15 +272,10 @@
             let hasKey = false;
             // let levelCleared = false;
             // let collectedStories = {}; // keys are note ids
-            // let hasNoteInCurrentLevel = false; // ⚠️ 추가: 현재 레벨에서 쪽지 획득 여부
-            // let levelCleared = false;
-            // let collectedStories = {}; // keys are note ids
-            // let currentLevelNoteId = null; // ⚠️ 추가: 현재 레벨에 배치된 쪽지 ID
-            let hasNoteInCurrentLevel = false;
+            let hasNoteInCurrentLevel = false; // ⚠️ 추가: 현재 레벨에서 쪽지 획득 여부
             let levelCleared = false;
-            let collectedStories = {};
-            let noteIdPlaced = null; // ⚠️ 수정: 현재 레벨에 '배치'된 쪽지 ID
-            let tempCollectedNoteId = null; // ⚠️ 신규 추가: 이번 레벨에서 '임시로 획득'한 쪽지 ID (레벨 클리어 시에만 영구 저장)
+            let collectedStories = {}; // keys are note ids
+            let currentLevelNoteId = null; // ⚠️ 추가: 현재 레벨에 배치된 쪽지 ID
 
             /* =========================
                4. 이미지 로드
@@ -347,18 +342,6 @@
                     ? "img/item/Letter.png"
                     : "img/item/Letter_empty.png";
             }
-            // function updateHud() {
-            //     levelText.textContent = level;
-            //     // Key 이미지 (빵)
-            //     itemKeyEl.src = collectedStories['key']
-            //         ? "img/item/Bread.png"
-            //         : "img/item/Bread_empty.png";
-            //     // Note 이미지 (편지)
-            //     const anyNote = ALL_NOTE_IDS.some(id => !!collectedStories[id]);
-            //     itemCompassEl.src = anyNote
-            //         ? "img/item/Letter.png"
-            //         : "img/item/Letter_empty.png";
-            // }
 
             function showToast(text, ms = 1600) {
                 const t = document.createElement('div'); t.className = 'toast'; t.textContent = text;
@@ -439,99 +422,6 @@
                 return { x: 1, y: 1 };
             }
 
-            // function placeItemsForLevel(lv) {
-            //     items = [];
-            //     // always place key
-            //     const k = findRandomPathCell(true);
-            //     items.push({ type: 'key', x: k.x, y: k.y, collected: false, storyId: 'key' });
-
-            //     // determine note to spawn according to spawnOrder and spawnIndex
-            //     const spawnOrder = ensureSpawnOrder();
-            //     const spawnIndex = getSpawnIndex();
-            //     let noteId = null;
-            //     if (spawnIndex < spawnOrder.length) noteId = spawnOrder[spawnIndex];
-            //     // fallback: pick any uncollected
-            //     if (!noteId) {
-            //         const uncollected = ALL_NOTE_IDS.filter(id => !collectedStories[id]);
-            //         noteId = uncollected.length ? uncollected[Math.floor(Math.random() * uncollected.length)] : ALL_NOTE_IDS[Math.floor(Math.random() * ALL_NOTE_IDS.length)];
-            //     }
-
-            //     // place the note (one per level)
-            //     const p = findRandomPathCell(true);
-            //     items.push({ type: 'note', x: p.x, y: p.y, collected: false, storyId: noteId, message: storyTexts[noteId] || null });
-
-            //     // advance spawn index so next level uses next slot
-            //     incrementSpawnIndex();
-            // }
-            // function placeItemsForLevel(lv) {
-            //     items = [];
-            //     // 항상 키 아이템 배치
-            //     const k = findRandomPathCell(true);
-            //     items.push({ type: 'key', x: k.x, y: k.y, collected: false, storyId: 'key' });
-
-            //     // 획득하지 않은 첫 번째 쪽지를 순서대로 찾기
-            //     const spawnOrder = ensureSpawnOrder();
-            //     let noteId = null;
-
-            //     // 1. spawnOrder를 순회하며 획득하지 않은 첫 쪽지 ID를 찾음
-            //     for (const id of spawnOrder) {
-            //         // id가 정의되어 있고 (null이 아니며) 아직 collectedStories에 없는 경우
-            //         if (id && !collectedStories[id]) {
-            //             noteId = id;
-            //             break;
-            //         }
-            //     }
-
-            //     // 폴백: 순서의 모든 쪽지를 모았거나, 순서 외의 쪽지가 남아있을 경우
-            //     if (!noteId) {
-            //         const uncollected = ALL_NOTE_IDS.filter(id => !collectedStories[id]);
-            //         // 획득하지 않은 쪽지가 있으면 랜덤으로 배치
-            //         if (uncollected.length) {
-            //             noteId = uncollected[Math.floor(Math.random() * uncollected.length)];
-            //         } else {
-            //             // 모든 쪽지를 모았다면, 다시 가장 첫 번째 쪽지를 표시 (디버그/재확인용)
-            //             noteId = ALL_NOTE_IDS[0];
-            //         }
-            //     }
-
-            //     // 쪽지 배치
-            //     const p = findRandomPathCell(true);
-            //     items.push({ type: 'note', x: p.x, y: p.y, collected: false, storyId: noteId, message: storyTexts[noteId] || null });
-
-            //     // 이제 session index를 관리하는 함수 호출이 불필요합니다.
-            // }
-            // function placeItemsForLevel(lv) {
-            //     items = [];
-            //     // 항상 키 아이템 배치
-            //     const k = findRandomPathCell(true);
-            //     items.push({ type: 'key', x: k.x, y: k.y, collected: false, storyId: 'key' });
-
-            //     const spawnOrder = ensureSpawnOrder();
-            //     let noteIdToSpawn = null;
-
-            //     // 1. spawnOrder를 순회하며 획득하지 않은 첫 쪽지 ID를 찾음 (순서 보장)
-            //     for (const id of spawnOrder) {
-            //         if (id && !collectedStories[id]) {
-            //             noteIdToSpawn = id;
-            //             break;
-            //         }
-            //     }
-
-            //     // 2. 폴백 로직 (모두 모았거나 순서 외 쪽지가 남은 경우)
-            //     if (!noteIdToSpawn) {
-            //         const uncollected = ALL_NOTE_IDS.filter(id => !collectedStories[id]);
-            //         if (uncollected.length) {
-            //             noteIdToSpawn = uncollected[Math.floor(Math.random() * uncollected.length)];
-            //         } else {
-            //             noteIdToSpawn = ALL_NOTE_IDS[0];
-            //         }
-            //     }
-
-            //     // 쪽지 배치
-            //     currentLevelNoteId = noteIdToSpawn; // ⚠️ 현재 레벨 쪽지 ID 기록
-            //     const p = findRandomPathCell(true);
-            //     items.push({ type: 'note', x: p.x, y: p.y, collected: false, storyId: currentLevelNoteId, message: storyTexts[currentLevelNoteId] || null });
-            // }
             function placeItemsForLevel(lv) {
                 items = [];
                 // 항상 키 아이템 배치
@@ -541,7 +431,7 @@
                 const spawnOrder = ensureSpawnOrder();
                 let noteIdToSpawn = null;
 
-                // 획득하지 않은 첫 쪽지 ID를 찾음 (순서 보장)
+                // 1. spawnOrder를 순회하며 획득하지 않은 첫 쪽지 ID를 찾음 (순서 보장)
                 for (const id of spawnOrder) {
                     if (id && !collectedStories[id]) {
                         noteIdToSpawn = id;
@@ -549,7 +439,7 @@
                     }
                 }
 
-                // 폴백 로직
+                // 2. 폴백 로직 (모두 모았거나 순서 외 쪽지가 남은 경우)
                 if (!noteIdToSpawn) {
                     const uncollected = ALL_NOTE_IDS.filter(id => !collectedStories[id]);
                     if (uncollected.length) {
@@ -560,10 +450,9 @@
                 }
 
                 // 쪽지 배치
-                noteIdPlaced = noteIdToSpawn; // ⚠️ 배치된 쪽지 ID 기록
-                tempCollectedNoteId = null; // ⚠️ 레벨 시작 시 임시 획득 ID 초기화 (핵심)
+                currentLevelNoteId = noteIdToSpawn; // ⚠️ 현재 레벨 쪽지 ID 기록
                 const p = findRandomPathCell(true);
-                items.push({ type: 'note', x: p.x, y: p.y, collected: false, storyId: noteIdPlaced, message: storyTexts[noteIdPlaced] || null });
+                items.push({ type: 'note', x: p.x, y: p.y, collected: false, storyId: currentLevelNoteId, message: storyTexts[currentLevelNoteId] || null });
             }
 
 
@@ -606,20 +495,6 @@
                 return built;
             }
 
-            // function getSpawnIndex() {
-            //     try {
-            //         const raw = sessionStorage.getItem(SPAWN_INDEX_KEY);
-            //         const n = raw ? parseInt(raw, 10) : 0;
-            //         return Number.isFinite(n) ? Math.max(0, n) : 0;
-            //     } catch (e) { return 0; }
-            // }
-            // function incrementSpawnIndex() {
-            //     try {
-            //         let n = getSpawnIndex();
-            //         n = Math.min(n + 1, 1000);
-            //         sessionStorage.setItem(SPAWN_INDEX_KEY, String(n));
-            //     } catch (e) { }
-            // }
             function resetSpawnSession() {
                 try {
                     sessionStorage.removeItem(SPAWN_KEY);
@@ -644,61 +519,6 @@
                 return true;
             }
 
-            // function tryCollectItems() {
-            //     for (let i = items.length - 1; i >= 0; i--) {
-            //         const it = items[i];
-            //         if (!it) continue;
-            //         const d = dist(player.x, player.y, it.x + 0.5, it.y + 0.5);
-            //         if (d < 0.8) {
-            //             it.collected = true;
-            //             items.splice(i, 1);
-            //             if (it.type === 'key') {
-            //                 hasKey = true;
-            //                 unlockNote('key');
-            //                 showStoryOverlay('열쇠 획득', storyTexts.key[0], 2000);
-            //             } else if (it.type === 'note') {
-            //                 const nid = it.storyId;
-            //                 unlockNote(nid);
-            //                 const content = collectedStories[nid] && collectedStories[nid].text ? collectedStories[nid].text : storyTexts[nid];
-            //                 showStoryOverlay('쪽지', content, 0);
-            //             } else {
-            //                 if (it.storyId) { unlockNote(it.storyId); showStoryOverlay('쪽지', storyTexts[it.storyId] || it.message || '(내용 없음)', 0); }
-            //                 else showToast('아이템 획득');
-            //             }
-            //             updateHud();
-            //         }
-            //     }
-            // }
-            // function tryCollectItems() {
-            //     for (let i = items.length - 1; i >= 0; i--) {
-            //         const it = items[i];
-            //         if (!it) continue;
-            //         const d = dist(player.x, player.y, it.x + 0.5, it.y + 0.5);
-            //         if (d < 0.8) {
-            //             it.collected = true;
-            //             items.splice(i, 1);
-            //             if (it.type === 'key') {
-            //                 hasKey = true;
-            //                 unlockNote('key');
-            //                 showStoryOverlay('열쇠 획득', storyTexts.key[0], 2000);
-            //             } else if (it.type === 'note') {
-            //                 const nid = it.storyId;
-            //                 unlockNote(nid);
-            //                 hasNoteInCurrentLevel = true; // ⚠️ 현재 레벨 쪽지 획득 상태 갱신
-            //                 const content = collectedStories[nid] && collectedStories[nid].text ? collectedStories[nid].text : storyTexts[nid];
-            //                 showStoryOverlay('쪽지', content, 0);
-            //             } else {
-            //                 if (it.storyId) {
-            //                     unlockNote(it.storyId);
-            //                     hasNoteInCurrentLevel = true; // ⚠️ 현재 레벨 쪽지 획득 상태 갱신
-            //                     showStoryOverlay('쪽지', storyTexts[it.storyId] || it.message || '(내용 없음)', 0);
-            //                 }
-            //                 else showToast('아이템 획득');
-            //             }
-            //             updateHud();
-            //         }
-            //     }
-            // }
             function tryCollectItems() {
                 for (let i = items.length - 1; i >= 0; i--) {
                     const it = items[i];
@@ -710,17 +530,23 @@
                         if (it.type === 'key') {
                             hasKey = true;
                             unlockNote('key'); // 키는 즉시 영구 저장 유지
-                            showStoryOverlay('열쇠 획득', storyTexts.key[0], 2000);
+                            // ⚠️ 수정: '열쇠 획득' 대신 '물자를 얻었다.'로 변경
+                            showToast('물자를 얻었다.');
                         } else if (it.type === 'note') {
                             const nid = it.storyId;
-                            // unlockNote(nid); // ⚠️ 영구 저장 로직 제거!
-                            tempCollectedNoteId = nid; // ⚠️ 쪽지 ID를 임시 저장
+                            // unlockNote(nid); // 쪽지 영구 저장 로직은 여전히 레벨 클리어 시점으로 지연되어야 함
+                            tempCollectedNoteId = nid; // 쪽지 ID를 임시 저장
                             hasNoteInCurrentLevel = true;
-                            const content = collectedStories[nid] && collectedStories[nid].text ? collectedStories[nid].text : storyTexts[nid];
-                            showStoryOverlay('쪽지', content, 0);
+
+                            // ⚠️ 수정: showStoryOverlay 대신 showToast 알림으로 변경 (쪽지 내용 숨김)
+                            showToast('쪽지를 얻었다.');
+
                         } else {
                             if (it.storyId) {
-                                // ... (other item logic)
+                                // 기타 아이템 처리 로직 (필요 시 수정)
+                                tempCollectedNoteId = it.storyId;
+                                hasNoteInCurrentLevel = true;
+                                showToast('아이템을 얻었다.'); // 기타 아이템 메시지
                             }
                             else showToast('아이템 획득');
                         }
@@ -729,57 +555,34 @@
                 }
             }
 
-            /* =========================
-             11. 목표 도달 확인 (Check Goal)
-             ========================= */
             function checkGoal() {
-                const px = Math.floor(player.x);
-                const py = Math.floor(player.y);
-
-                // 목표 지점 (Exit)에 도달했는지 확인
-                // 기존 목표 지점 확인 로직 (거리 기반 d < 0.8) 대신 타일 좌표 기반 로직으로 변경하여 통일성을 유지합니다.
-                // 다만, 제공하신 코드에는 dist를 사용하므로, 그대로 dist 로직을 사용하겠습니다.
-
                 const d = dist(player.x, player.y, goal.x + 0.5, goal.y + 0.5);
-
                 if (d < 0.8 && !levelCleared) {
                     if (hasKey) {
-                        // ⚠️ 기존 레벨 클리어 로직을 신규 함수 호출로 대체 (쪽지 저장 버그 해결 핵심)
-                        completeLevelAndProgress();
-                        // completeLevelAndProgress 함수 내에서 levelCleared = true 설정 및 다음 레벨 로딩을 처리합니다.
+                        levelCleared = true;
+                        const nextLevel = level + 1; const MAX_LEVEL = 15;
+                        if (level >= MAX_LEVEL) {
+                            showLoadingOverlay('엔딩을 준비 중입니다...');
+                            setTimeout(() => {
+                                hideOverlay();
+                                unlockNote('ending');
+                                showStoryOverlay('엔딩', storyTexts.ending[0], 0);
+                            }, 800);
+                            return;
+                        }
+                        showLoadingOverlay(`레벨 ${nextLevel} 로딩 중...`);
+                        setTimeout(() => {
+                            level = nextLevel;
+                            startLevel(level);
+                            hideOverlay();
+                            levelCleared = false;
+                            lastTime = performance.now();
+                        }, 700);
                     } else {
                         showToast("아이템이 부족합니다! 물자를 모아야 합니다.", 1800);
                     }
                 }
             }
-            // function checkGoal() {
-            //     const d = dist(player.x, player.y, goal.x + 0.5, goal.y + 0.5);
-            //     if (d < 0.8 && !levelCleared) {
-            //         if (hasKey) {
-            //             levelCleared = true;
-            //             const nextLevel = level + 1; const MAX_LEVEL = 15;
-            //             if (level >= MAX_LEVEL) {
-            //                 showLoadingOverlay('엔딩을 준비 중입니다...');
-            //                 setTimeout(() => {
-            //                     hideOverlay();
-            //                     unlockNote('ending');
-            //                     showStoryOverlay('엔딩', storyTexts.ending[0], 0);
-            //                 }, 800);
-            //                 return;
-            //             }
-            //             showLoadingOverlay(`레벨 ${nextLevel} 로딩 중...`);
-            //             setTimeout(() => {
-            //                 level = nextLevel;
-            //                 startLevel(level);
-            //                 hideOverlay();
-            //                 levelCleared = false;
-            //                 lastTime = performance.now();
-            //             }, 700);
-            //         } else {
-            //             showToast("아이템이 부족합니다! 물자를 모아야 합니다.", 1800);
-            //         }
-            //     }
-            // }
 
             /* =========================
                11. 시야 & 미니맵
@@ -946,102 +749,6 @@
                 overlayPanel.appendChild(actions);
                 overlay.style.display = 'flex';
             }
-            // function showGroupOverlay(group) {
-            //     const parts = group.parts;
-            //     const collectedParts = parts.filter(pid => !!collectedStories[pid]);
-            //     const collectedCount = collectedParts.length;
-            //     const total = parts.length;
-            //     const gotAll = collectedCount === total;
-
-            //     if (collectedCount === 0) {
-            //         showToast('획득한 쪽지가 없습니다.');
-            //         return;
-            //     }
-
-            //     let combined = [];
-            //     let storyContentHtml = '';
-
-            //     // 요청 1. 모든 쪽지를 모았을 경우, 합쳐진 스토리 완성
-            //     if (gotAll) {
-            //         combined = parts.map(pid => storyTexts[pid] || '');
-            //         storyContentHtml += '<div style="margin-bottom: 15px; font-weight: bold; color: #ffeb3b;">스토리 완성!</div>';
-            //         combined.flat().forEach((para, index) => {
-            //             const title = parts[index].split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-            //             storyContentHtml += `<div style="font-size: 1.1em; margin-bottom: 4px; color: #9be6ff;">-- Part ${index + 1}: ${title} --</div>`;
-            //             storyContentHtml += `<pre class="story">${para}</pre>`;
-            //         });
-            //     } else {
-            //         // 모든 쪽지를 모으지 못했을 경우, 획득한 쪽지만 보여줌
-            //         storyContentHtml += '<div style="margin-bottom: 10px; opacity: 0.8;">(일부 획득)</div>';
-            //         collectedParts.forEach((pid) => {
-            //             const txt = collectedStories[pid].text || storyTexts[pid];
-            //             let content = Array.isArray(txt) ? txt.join('\n\n') : String(txt || '');
-            //             const titlePart = pid.split('_').pop();
-            //             storyContentHtml += `<div style="font-size: 1.1em; margin-bottom: 4px; color: #9be6ff;">-- Part: ${titlePart} --</div>`;
-            //             storyContentHtml += `<pre class="story">${content}</pre>`;
-            //         });
-            //     }
-
-            //     overlayPanel.innerHTML = '';
-            //     const h = document.createElement('h3'); h.style.margin = '0 0 8px'; h.textContent = group.label;
-            //     overlayPanel.appendChild(h);
-
-            //     const noteContainer = document.createElement('div');
-            //     noteContainer.innerHTML = storyContentHtml;
-            //     overlayPanel.appendChild(noteContainer);
-
-            //     const hint = document.createElement('p'); hint.style.opacity = '0.9'; hint.style.marginTop = '8px';
-            //     hint.textContent = gotAll ? `모든 쪽지를 모았습니다. 완성된 스토리가 해금되었습니다.` : `모은 쪽지: ${collectedCount}/${total}. 모든 쪽지를 모아야 완성된 스토리를 볼 수 있습니다.`;
-            //     overlayPanel.appendChild(hint);
-
-            //     const actions = document.createElement('div'); actions.className = 'actions';
-            //     const closeBtn = document.createElement('button'); closeBtn.className = 'primary'; closeBtn.textContent = '닫기';
-            //     closeBtn.onclick = () => { overlay.style.display = 'none'; };
-            //     actions.appendChild(closeBtn);
-            //     overlayPanel.appendChild(actions);
-            //     overlay.style.display = 'flex';
-            // }
-
-            // function showGroupOverlay(group) {
-            //     const parts = group.parts;
-            //     const collectedParts = parts.filter(pid => !!collectedStories[pid]);
-            //     if (collectedParts.length === 0) {
-            //         showToast('획득한 쪽지가 없습니다.');
-            //         return;
-            //     }
-
-            //     let combined = [];
-            //     for (const pid of parts) {
-            //         if (collectedStories[pid]) {
-            //             const t = collectedStories[pid].text || storyTexts[pid] || '';
-            //             if (Array.isArray(t)) combined = combined.concat(t);
-            //             else combined.push(String(t));
-            //         }
-            //     }
-
-            //     const gotAll = collectedParts.length === parts.length;
-            //     overlayPanel.innerHTML = '';
-            //     const h = document.createElement('h3'); h.style.margin = '0 0 8px'; h.textContent = group.label;
-            //     overlayPanel.appendChild(h);
-
-            //     const noteContainer = document.createElement('div');
-            //     combined.forEach((para) => {
-            //         const p = document.createElement('pre'); p.className = 'story'; p.textContent = para;
-            //         noteContainer.appendChild(p);
-            //     });
-            //     overlayPanel.appendChild(noteContainer);
-
-            //     const hint = document.createElement('p'); hint.style.opacity = '0.9'; hint.style.marginTop = '8px';
-            //     hint.textContent = gotAll ? `모든 쪽지를 모았습니다. 전체 스토리가 해금되었습니다.` : `모은 쪽지: ${collectedParts.length}/${parts.length}. 모든 쪽지를 모으면 관련 스토리가 완전히 해금됩니다.`;
-            //     overlayPanel.appendChild(hint);
-
-            //     const actions = document.createElement('div'); actions.className = 'actions';
-            //     const closeBtn = document.createElement('button'); closeBtn.className = 'primary'; closeBtn.textContent = '닫기';
-            //     closeBtn.onclick = () => { overlay.style.display = 'none'; };
-            //     actions.appendChild(closeBtn);
-            //     overlayPanel.appendChild(actions);
-            //     overlay.style.display = 'flex';
-            // }
 
             function openCodex() {
                 codexPanel.innerHTML = '<h3 style="margin-top:0">스토리 도감</h3>';
@@ -1345,67 +1052,6 @@
                     updateHud();
                 });
             }
-            // function startLevel(lv) {
-            //     hasKey = false;
-
-            //     // ⚠️ 수정: 레벨별 타일셋 경로를 사용자가 요청한 순서로 변경 (road, mart, road, house, road, forest...)
-            //     const PATHS = {
-            //         ROAD: "img/c/tiles_road/",
-            //         MART: "img/c/tiles_mart/",
-            //         MANSION: "img/c/tiles_mansion/", // 'house'로 간주
-            //         RUINS: "img/c/tiles_ruins/",     // 'forest'로 간주 (Level 6부터 반복 적용)
-            //         OUTSIDE: "img/c/tiles_outside/"
-            //     };
-
-            //     // 레벨 순서 정의 (Level 1부터 시작)
-            //     const TILE_SET_SEQUENCE = [
-            //         null,          // 레벨 0 (미사용)
-            //         PATHS.ROAD,    // 1: road
-            //         PATHS.MART,    // 2: mart
-            //         PATHS.ROAD,    // 3: road
-            //         PATHS.MANSION, // 4: house (mansion)
-            //         PATHS.ROAD,    // 5: road
-            //         PATHS.RUINS,   // 6: forest (ruins)
-            //         PATHS.RUINS,   // 7: forest
-            //         PATHS.RUINS,   // 8: forest
-            //         PATHS.RUINS,   // 9: forest
-            //     ];
-
-            //     const levelToLoad = lv || 1;
-
-            //     // TILE_SET_SEQUENCE에 정의된 레벨을 사용하거나, 없으면 RUINS를 기본값으로 사용
-            //     const basePath = TILE_SET_SEQUENCE[levelToLoad] || PATHS.RUINS;
-
-
-            //     const loadPromises = [];
-            //     for (const key in blockImages) {
-            //         loadPromises.push(
-            //             new Promise((resolve) => {
-            //                 const img = blockImages[key];
-            //                 img.onload = () => resolve();
-            //                 img.src = `${basePath}block_${key}.png`;
-            //             })
-            //         );
-            //     }
-
-            //     Promise.all(loadPromises).then(() => {
-            //         level = levelToLoad;
-            //         cols = 21 + (level - 1) * 2;
-            //         rows = 21 + (level - 1) * 2;
-            //         if (cols % 2 === 0) cols++; if (rows % 2 === 0) rows++;
-
-            //         timeLimitSeconds = getTimeLimitForLevel(level);
-            //         startTime = Date.now();
-            //         timeUp = false;
-
-            //         generateMaze(cols, rows);
-            //         player.x = 1.5; player.y = 1.5; player.vx = 0; player.vy = 0;
-            //         levelCleared = false;
-            //         placeItemsForLevel(level);
-            //         revealAround(player.x, player.y);
-            //         updateHud();
-            //     });
-            // }
 
             const showIntroStart = () => {
                 overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3>
@@ -1421,35 +1067,7 @@
             };
 
             /* =========================
-              17. 레벨 클리어/진행
-              ========================= */
-            function completeLevelAndProgress() {
-                // 1. 쪽지 영구 저장 확인 (버그 해결 핵심!)
-                if (tempCollectedNoteId) {
-                    // 임시 획득한 쪽지를 영구 저장하고 로컬 스토리지에 반영
-                    unlockNote(tempCollectedNoteId);
-                    showToast(`쪽지 [${tempCollectedNoteId}]가 도감에 저장되었습니다.`);
-                    tempCollectedNoteId = null; // 초기화
-                }
-
-                // 2. 레벨 클리어 및 다음 레벨로 진행
-                levelCleared = true;
-                showStoryOverlay(`Level ${level} 클리어!`, storyTexts[`level${level}`] || ['미궁을 벗어났다.'], 1500);
-
-                // 3. 다음 레벨 시작
-                setTimeout(() => {
-                    if (level < 99) {
-                        startLevel(level + 1);
-                        requestAnimationFrame(update); // update loop 재시작
-                    } else {
-                        showStoryOverlay('엔딩', storyTexts.ending[0], 0);
-                    }
-                }, 1500);
-            }
-
-
-            /* =========================
-               18. 입력 / 조이스틱 초기화
+               17. 입력 / 조이스틱 초기화
                ========================= */
             const joystick = document.getElementById('joystick');
             const stick = document.getElementById('stick');
@@ -1475,7 +1093,7 @@
             }
 
             /* =========================
-               19. 이벤트 바인딩 (Buttons)
+               18. 이벤트 바인딩 (Buttons)
                ========================= */
             function initListeners() {
                 // Debug Reset Spawn Order
@@ -1502,7 +1120,7 @@
             }
 
             /* =========================
-               20. 초기 실행
+               19. 초기 실행
                ========================= */
             loadStories();
             initInput();

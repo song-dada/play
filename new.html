@@ -1,0 +1,1383 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>랜덤 미로 게임 (리팩토링 버전)</title>
+    <link rel="stylesheet" href="css/gpt.css">
+    <style>
+        .loading-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 6px solid rgba(255, 255, 255, 0.15);
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-msg {
+            font-size: 16px;
+            color: #fff;
+            text-align: center;
+            max-width: 300px;
+        }
+
+        .toast {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 30px;
+            background: #222;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            opacity: 0.95;
+            z-index: 9999;
+        }
+
+        #codexPanel .group {
+            padding: 10px 0;
+            border-bottom: 1px dashed #333;
+            cursor: pointer;
+        }
+
+        #codexPanel .group .meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #codexPanel .group .meta .title {
+            font-weight: 600;
+        }
+
+        #codexPanel .group .meta .count {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        pre.story {
+            white-space: pre-wrap;
+            margin: 6px 0;
+            background: #0f0f0f;
+            color: #eaeaea;
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        /* 작은 디버그 버튼 (선택) */
+        .debug-reset {
+            position: fixed;
+            right: 12px;
+            top: 12px;
+            z-index: 9999;
+            font-size: 12px;
+        }
+
+        /* 리팩토링된 버튼 스타일 */
+        .hud-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 8px;
+            justify-content: flex-end;
+            /* 오른쪽 정렬 */
+        }
+
+        .hud-actions button {
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 0;
+            cursor: pointer;
+            background: #2a2a2a;
+            color: #fff;
+        }
+
+        .hud-actions button.primary {
+            background: #3b82f6;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div id="ads"></div>
+        <div id="hubmap">
+            <div class="hud">
+                <div class="hubup">
+                    <div class="panel" id="levelPanel">
+                        레벨: <span id="levelText">1</span>
+                    </div>
+                    <div class="panel items" id="itemPanel">
+                        아이템:
+                        <img id="itemKeyEl" src="img/item/Bread_empty.png" alt="key" width="24" height="24">
+                        <img id="itemCompassEl" src="img/item/Letter_empty.png" alt="compass" width="24" height="24">
+                    </div>
+                </div>
+                <div class="hud-actions">
+                    <button id="homeBtn">홈</button>
+                    <button class="primary" id="freshStartBtn">처음부터 시작</button>
+                    <button id="codexBtn">📖 도감</button>
+                </div>
+            </div>
+            <div id="miniWrapper"><canvas id="miniMap" width="260" height="260"></canvas></div>
+        </div>
+
+        <div id="gameWrapper">
+            <canvas id="game" width="480" height="480"></canvas>
+        </div>
+
+        <div id="joystickWrap">
+            <div id="joystick">
+                <div id="stick"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="overlay" class="overlay" style="display:none">
+        <div class="panel" id="overlayPanel"></div>
+    </div>
+
+    <div id="codexOverlay" class="overlay" style="display:none">
+        <div class="panel" id="codexPanel"></div>
+    </div>
+
+    <button id="resetSpawn" class="debug-reset">Reset Spawn Order (session)</button>
+
+    <script>
+        const MazeGame = {
+            /**
+             * 1. 설정 (Configuration)
+             * - 게임의 핵심 상수, 데이터, 텍스트 등을 관리합니다.
+             */
+            config: {
+                STORAGE_KEY: 'maze_collectedStories_v1',
+                SPAWN_KEY: 'maze_spawnOrder_v1',
+                SPAWN_INDEX_KEY: 'maze_spawnIndex_v1',
+                STORY_GROUPS: [
+                    { id: 'siblings', label: '남매 (마트 기록)', parts: ['siblings_1', 'siblings_2', 'siblings_3'], fullStoryId: 'siblings_full' },
+                    { id: 'maid', label: '가정부 (대저택 기록)', parts: ['maid_1', 'maid_2', 'maid_3'], fullStoryId: 'maid_full' },
+                    { id: 'traveler', label: '여행객 (길 위의 기록)', parts: ['traveler_1', 'traveler_2', 'traveler_3'], fullStoryId: 'traveler_full' },
+                    { id: 'sibling_younger', label: '남매(동생) (희망 붕괴)', parts: ['sibling_younger_1', 'sibling_younger_2', 'sibling_younger_3'], fullStoryId: 'sibling_younger_full' },
+                    { id: 'weak_union', label: '약자 연합 (여행객과 함께한 기록)', parts: ['weak_union_1', 'weak_union_2', 'weak_union_3'], fullStoryId: 'weak_union_full' }
+                ],
+                STORY_TEXTS: {
+                    intro: ['깊은 미궁 속으로 발을 내딛었다. 어둠 속에서 무언가 속삭이는 듯하다...'],
+                    key: ['낡은 열쇠를 손에 넣었다. 녹슨 금속이 차갑게 닿는다.'],
+                    compass: [['서쪽에서 기묘한 기운이 느껴진다...', '나침반이 갑자기 흔들리며 방향을 잃는다...'], ['멀리서 낮은 울음소리가 들려온다...', '벽에 새겨진 고대 문양이 눈에 들어왔다...'], ['‘출구는 없다’는 목소리가 메아리쳤다...', '차갑고 습한 공기가 더 짙어졌다...']],
+                    level1: ['첫 번째 미궁을 통과했다!'],
+                    level2: ['더 깊은 곳으로 발걸음을 옮긴다...'],
+                    ending: ['드디어 미궁에서 탈출했다!'],
+                    siblings_1: ["여기서 식량과 약품을 확보했다.\n처음엔 살아남았다는 안도뿐이었다."],
+                    siblings_2: ["라디오가 잡혔다.\n노이즈 속에서… “캠프.”\n생존자 캠프라 들렸다."],
+                    siblings_3: ["(38.6-34.4)… 전부는 번졌다.\n좌표다. 우리는 그곳으로 간다."],
+                    maid_1: ["저택은 조용했다.\n세상이 어지럽다 해도, 여긴 변함없었다."],
+                    maid_2: ["집사가 피를 토했다.\n사모님은 미소를 지으셨다.\n그 웃음이… 두려웠다."],
+                    maid_3: ["일주일을 버텼다.\n더는 못 한다.\n나는 이곳을 떠난다."],
+                    traveler_1: ["처음 보는 무리와 합류했다.\n낯선 나를 반겨주어… 다행이었다."],
+                    traveler_2: ["길은 막혔고, 위험은 많았다.\n하지만 혼자였다면 벌써 포기했을 것이다."],
+                    traveler_3: ["내일은 더 나아지리라 믿는다.\n우리가 도착할 곳은 여기 아니니까."],
+                    sibling_younger_1: ["누나가 기침을 시작했다.\n멀쩡했던 사람이, 갑자기."],
+                    sibling_younger_2: ["열은 오르고, 기침은 거칠어졌다.\n내 약을 건븄지만… 고갤 저었다."],
+                    sibling_younger_3: ["누나는 쓰러졌다.\n나는 살아서 캠프로 갈게.\n잘 자, 누나."],
+                    weak_union_1: ["우린 약자였다.\n그래서 모였다. 서로를 지키기 위해."],
+                    weak_union_2: ["뒤따르던 그를 받아들였다.\n낯설었지만, 적은 아니었다."],
+                    weak_union_3: ["아침, 그는 이미 식어 있었다.\n장례를 치르고… 발걸음을 떼었다."],
+                    siblings_full: ["누나는 식량과 약품을 챙기는 데 능숙했다. 황폐해진 마트에서 찾은 생존 물품은 잠시나마 안도감을 주었다. 그러나 희망은 무선 통신에서 찾은 '캠프'라는 단어였다. 우리는 그곳으로 가기 위해 지도에 좌표를 새겼다. 이제 이 미궁을 벗어나 그 좌표(38.6-34.4)로 향하는 것이 우리의 유일한 목표가 되었다. 이 낡은 기록은 우리의 여정의 시작을 알린다."],
+                    maid_full: ["대저택은 세상의 혼란과는 무관하게 고요했다. 가정부인 나는 이 평온함이 기이하게 느껴졌다. 어느 날, 집사님이 피를 토하는 모습을 보았고, 그때 사모님의 차가운 미소는 나에게 공포 그 자체였다. 이 저택은 안전한 피난처가 아니었다. 일주일을 버티고, 더 이상 버틸 수 없다고 판단한 나는 몰래 저택을 떠나기로 결심했다. 이 기록은 내가 탈출하기 직전의 심정을 담고 있다."],
+                    traveler_full: ["나는 홀로 떠돌던 여행객이었다. 길 위에서 우연히 만난 무리는 낯선 나를 조건 없이 받아주었고, 나는 그들의 따뜻함에 감사했다. 미궁은 막혀있었고, 길은 위험으로 가득했지만, 혼자였다면 이미 좌절했을 것이다. 나는 그들과 함께라면 더 나은 곳에 도착할 수 있을 거라 믿었다. 매일 밤, 우리는 내일을 기약하며 잠들었다. 이 이야기는 내가 그들과 함께했던, 짧고도 희망찼던 기록이다."],
+                    sibling_younger_full: ["누나가 기침을 시작한 건 갑작스러운 일이었다. 처음엔 단순한 감기라 생각했지만, 그녀의 열은 걷잡을 수 없이 올랐고 기침은 흉측하게 거칠어졌다. 나는 필사적으로 약을 건넸지만, 누나는 고개를 저었다. 그녀는 결국 쓰러졌고, 나는 그녀를 둔 채 살아서 캠프로 가야만 했다. 미안함과 슬픔을 뒤로한 채, 나는 누나에게 마지막 작별 인사를 고했다. 이 기록은 희망이 붕괴된 순간의 참혹한 증언이다."],
+                    weak_union_full: ["우리는 세상에서 가장 약한 존재들이었기에, 서로를 지키기 위해 연합했다. 우리는 생존이라는 공동의 목표 아래 낯선 이들을 받아들이는 데 주저하지 않았다. 여행객이 그중 한 명이었다. 그는 조용했지만 강인했다. 그러나 생존은 잔혹했다. 어느 아침, 그는 이미 차갑게 식어 있었다. 우리는 그의 장례를 치렀고, 슬픔을 이겨내며 다시 발걸음을 떼었다. 이 기록은 약자들의 연합이 겪은 비극과 재출발의 이야기이다."]
+                },
+                get ALL_NOTE_IDS() {
+                    return [].concat(...this.STORY_GROUPS.map(g => g.parts));
+                }
+            },
+
+            /**
+             * 2. 상태 (State)
+             * - 게임 진행 중 계속 변하는 모든 데이터를 관리합니다.
+             */
+            state: {
+                tileSize: 30,
+                rows: 21, cols: 21,
+                maze: [],
+                revealMap: [],
+                visitedMap: [],
+                items: [],
+                level: 1,
+                player: { x: 1.5, y: 1.5, size: 0.65, vx: 0, vy: 0 },
+                speed: 4.2,
+                lastTime: 0,
+                goal: { x: 19, y: 19 },
+                startTime: 0,
+                timeLimitSeconds: 90,
+                timeUp: false,
+                hasKey: false,
+                levelCleared: false,
+                collectedStories: {},
+                hasNoteInCurrentLevel: false,
+                currentLevelNoteId: null,
+                keys: {},
+                joyActive: false,
+                joyCenter: null,
+                blockImages: {},
+                itemImages: { "note": new Image(), "key": new Image() },
+                isRunning: true,
+            },
+
+            /**
+             * 3. DOM 요소 및 컨텍스트
+             * - 자주 사용하는 DOM 객체와 캔버스 컨텍스트를 보관합니다.
+             */
+            dom: {
+                gameCanvas: null, ctx: null,
+                miniCanvas: null, miniCtx: null,
+                overlay: null, overlayPanel: null,
+                codexOverlay: null, codexPanel: null,
+                codexBtn: null, homeBtn: null, freshStartBtn: null,
+                levelText: null, itemKeyEl: null, itemCompassEl: null,
+                joystick: null, stick: null
+            },
+
+            /**
+             * 4. 유틸리티 (Utils)
+             * - 범용적으로 사용되는 헬퍼 함수들을 관리합니다.
+             */
+            utils: {
+                inBounds: (x, y) => y >= 0 && y < MazeGame.state.maze.length && x >= 0 && x < MazeGame.state.maze[0].length,
+                randInt: (a, b) => Math.floor(Math.random() * (b - a + 1)) + a,
+                dist: (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by),
+                getTimeLimitForLevel(lv) {
+                    if (lv <= 1) return 90;
+                    if (lv === 2) return 120;
+                    if (lv === 3) return 150;
+                    return 150 + (lv - 3) * 30;
+                }
+            },
+
+            /**
+             * 5. UI 관리
+             * - HUD 업데이트, 토스트 메시지, 오버레이 등 UI 관련 로직을 담당합니다.
+             */
+            ui: {
+                updateHud() {
+                    MazeGame.dom.levelText.textContent = MazeGame.state.level;
+                    MazeGame.dom.itemKeyEl.src = MazeGame.state.hasKey ? "img/item/Bread.png" : "img/item/Bread_empty.png";
+                    MazeGame.dom.itemCompassEl.src = MazeGame.state.hasNoteInCurrentLevel ? "img/item/Letter.png" : "img/item/Letter_empty.png";
+                },
+                showToast(text, ms = 1600) {
+                    const t = document.createElement('div'); t.className = 'toast'; t.textContent = text;
+                    document.body.appendChild(t);
+                    setTimeout(() => t.remove(), ms);
+                },
+                showLoadingOverlay(message = '다음 레벨 로딩 중...') {
+                    const { overlay, overlayPanel } = MazeGame.dom;
+                    overlayPanel.innerHTML = '';
+                    const box = document.createElement('div'); box.className = 'loading-box';
+                    const spinner = document.createElement('div'); spinner.className = 'spinner';
+                    const msg = document.createElement('div'); msg.className = 'loading-msg'; msg.textContent = message;
+                    box.appendChild(spinner); box.appendChild(msg);
+                    overlayPanel.appendChild(box);
+                    overlay.style.display = 'flex';
+                },
+                hideOverlay() {
+                    MazeGame.dom.overlay.style.display = 'none';
+                    MazeGame.dom.overlayPanel.innerHTML = '';
+                },
+                showStoryOverlay(title, text, autoCloseMs = 3000) {
+                    const { overlay, overlayPanel } = MazeGame.dom;
+                    overlayPanel.innerHTML = '';
+                    const h = document.createElement('h3'); h.style.margin = '0 0 6px'; h.textContent = title || '상세';
+                    overlayPanel.appendChild(h);
+                    let content = Array.isArray(text) ? text.join('\n\n') : String(text || '');
+                    if (content) {
+                        const p = document.createElement('pre'); p.className = 'story'; p.textContent = content;
+                        overlayPanel.appendChild(p);
+                    }
+                    const actions = document.createElement('div'); actions.className = 'actions';
+                    const closeBtn = document.createElement('button'); closeBtn.className = 'primary'; closeBtn.textContent = '닫기';
+                    closeBtn.onclick = () => { overlay.style.display = 'none'; };
+                    actions.appendChild(closeBtn);
+                    overlayPanel.appendChild(actions);
+                    overlay.style.display = 'flex';
+                    if (autoCloseMs > 0) {
+                        setTimeout(() => { if (overlay.style.display === 'flex') overlay.style.display = 'none'; }, autoCloseMs);
+                    }
+                },
+                showGameOverOverlay({ title = '게임 오버', message = '' } = {}) {
+                    const { overlay, overlayPanel } = MazeGame.dom;
+                    overlayPanel.innerHTML = '';
+                    const panel = document.createElement('div'); panel.className = 'panel';
+                    const h3 = document.createElement('h3'); h3.textContent = title; panel.appendChild(h3);
+                    if (message) { const p = document.createElement('p'); p.innerText = message; panel.appendChild(p); }
+                    const actions = document.createElement('div'); actions.className = 'actions';
+                    const restartBtn = document.createElement('button'); restartBtn.className = 'primary'; restartBtn.textContent = '다시 시작';
+                    // restartBtn.onclick = () => {
+                    //     overlay.style.display = 'none';
+                    //     MazeGame.state.timeUp = false;
+                    //     MazeGame.engine.startLevel(MazeGame.state.level);
+                    //     requestAnimationFrame(MazeGame.engine.update);
+                    // };
+                    restartBtn.onclick = () => {
+                        overlay.style.display = 'none';
+                        MazeGame.state.timeUp = false;
+                        MazeGame.engine.startLevel(MazeGame.state.level);
+                        // .bind(MazeGame.engine)을 추가하여 'this'를 명시적으로 바인딩합니다.
+                        requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
+                    };
+                    // restartBtn.onclick = () => {
+                    //     overlay.style.display = 'none';
+                    //     MazeGame.state.timeUp = false;
+                    //     MazeGame.engine.startLevel(MazeGame.state.level);
+                    //     // 여기서 .bind()가 빠져서 'this' 컨텍스트가 유실됩니다.
+                    //     requestAnimationFrame(MazeGame.engine.update);
+                    // };
+                    actions.appendChild(restartBtn);
+                    const exitBtn = document.createElement('button'); exitBtn.className = 'ghost'; exitBtn.style.marginLeft = '8px'; exitBtn.textContent = '종료';
+                    // exitBtn.onclick = () => {
+                    //     overlay.style.display = 'none';
+                    //     MazeGame.state.timeUp = false;
+
+                    //     // ✅ 전체 상태 리셋
+                    //     MazeGame.state = {
+                    //         ...MazeGame.state,
+                    //         maze: [],
+                    //         revealMap: [],
+                    //         visitedMap: [],
+                    //         items: [],
+                    //         hasKey: false,
+                    //         hasNoteInCurrentLevel: false,
+                    //         levelCleared: false,
+                    //         joyActive: false,
+                    //         timeUp: false,
+                    //         player: { x: 1.5, y: 1.5, size: 0.65, vx: 0, vy: 0 },
+                    //     };
+
+                    //     MazeGame.ui.updateHud();
+                    //     MazeGame.engine.showIntroStart();
+                    // };
+                    exitBtn.onclick = () => {
+                        overlay.style.display = 'none';
+                        MazeGame.state.timeUp = false;
+
+                        // ✅ 루프 중단
+                        MazeGame.state.isRunning = false;
+
+                        // ✅ 상태 리셋 (미로, 아이템, 플레이어 등)
+                        MazeGame.state.maze = [];
+                        MazeGame.state.revealMap = [];
+                        MazeGame.state.visitedMap = [];
+                        MazeGame.state.items = [];
+                        MazeGame.state.hasKey = false;
+                        MazeGame.state.hasNoteInCurrentLevel = false;
+                        MazeGame.state.levelCleared = false;
+                        MazeGame.state.joyActive = false;
+                        MazeGame.state.player = { x: 1.5, y: 1.5, size: 0.65, vx: 0, vy: 0 };
+
+                        MazeGame.ui.updateHud();
+
+                        // ✅ 홈화면 표시
+                        MazeGame.engine.showIntroStart();
+                    };
+                    // exitBtn.onclick = () => {
+                    //     overlay.style.display = 'none';
+                    //     MazeGame.state.timeUp = false;
+                    //     MazeGame.engine.showIntroStart();
+                    // };
+                    actions.appendChild(exitBtn);
+                    panel.appendChild(actions);
+                    overlayPanel.appendChild(panel);
+                    overlay.style.display = 'flex';
+                }
+            },
+
+            /**
+             * 6. 도감 (Codex) 관리
+             * - 스토리 도감 열기, 그룹별 스토리 보기 등 도감 관련 기능을 담당합니다.
+             */
+            codex: {
+                showGroupOverlay(group) {
+                    const { collectedStories } = MazeGame.state;
+                    const { STORY_TEXTS } = MazeGame.config;
+                    const { overlay, overlayPanel } = MazeGame.dom;
+                    const parts = group.parts;
+                    const collectedParts = parts.filter(pid => !!collectedStories[pid]);
+                    const collectedCount = collectedParts.length;
+                    const total = parts.length;
+                    const gotAll = collectedCount === total;
+                    const fullStoryId = group.fullStoryId;
+                    const fullStoryText = fullStoryId ? STORY_TEXTS[fullStoryId] : null;
+
+                    if (collectedCount === 0) {
+                        MazeGame.ui.showToast('획득한 쪽지가 없습니다.');
+                        return;
+                    }
+
+                    let storyContentHtml = '';
+                    const displayParts = gotAll ? parts : collectedParts;
+                    if (gotAll) {
+                        storyContentHtml += '<div style="margin-bottom: 15px; font-weight: bold; color: #ffeb3b;">스토리 완성!</div>';
+                    } else {
+                        storyContentHtml += '<div style="margin-bottom: 10px; opacity: 0.8;">(일부 획득)</div>';
+                    }
+                    displayParts.forEach((pid, index) => {
+                        const txt = collectedStories[pid]?.text || STORY_TEXTS[pid];
+                        let content = Array.isArray(txt) ? txt.join('\n\n') : String(txt || '');
+                        const title = pid.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                        storyContentHtml += `<div style="font-size: 1.1em; margin-bottom: 4px; color: #9be6ff;">-- Part ${index + 1}: ${title} --</div>`;
+                        storyContentHtml += `<pre class="story">${content}</pre>`;
+                    });
+
+                    overlayPanel.innerHTML = '';
+                    const h = document.createElement('h3'); h.style.margin = '0 0 8px'; h.textContent = group.label;
+                    overlayPanel.appendChild(h);
+                    const noteContainer = document.createElement('div');
+                    noteContainer.innerHTML = storyContentHtml;
+                    overlayPanel.appendChild(noteContainer);
+
+                    if (gotAll && fullStoryText) {
+                        const fullStoryBtn = document.createElement('button');
+                        fullStoryBtn.className = 'primary';
+                        fullStoryBtn.textContent = '📖 전체 스토리 보기';
+                        Object.assign(fullStoryBtn.style, { marginTop: '15px', marginBottom: '8px', width: '100%' });
+                        fullStoryBtn.onclick = () => {
+                            overlay.style.display = 'none';
+                            MazeGame.ui.showStoryOverlay(`[${group.label}] - 전체 스토리`, fullStoryText, 0);
+                        };
+                        overlayPanel.appendChild(fullStoryBtn);
+                    }
+
+                    const hint = document.createElement('p');
+                    Object.assign(hint.style, { opacity: '0.9', marginTop: '8px' });
+                    hint.textContent = gotAll ? `모든 쪽지를 모았습니다. 완성된 스토리가 해금되었습니다.` : `모은 쪽지: ${collectedCount}/${total}. 모든 쪽지를 모아야 완성된 스토리를 볼 수 있습니다.`;
+                    overlayPanel.appendChild(hint);
+
+                    const actions = document.createElement('div'); actions.className = 'actions';
+                    const closeBtn = document.createElement('button'); closeBtn.className = 'ghost'; closeBtn.textContent = '닫기';
+                    closeBtn.onclick = () => { overlay.style.display = 'none'; };
+                    actions.appendChild(closeBtn);
+                    overlayPanel.appendChild(actions);
+                    overlay.style.display = 'flex';
+                },
+
+                open() {
+                    const { codexPanel, codexOverlay } = MazeGame.dom;
+                    const { collectedStories } = MazeGame.state;
+                    const { STORY_GROUPS, STORY_TEXTS } = MazeGame.config;
+
+                    codexPanel.innerHTML = '<h3 style="margin-top:0">스토리 도감</h3>';
+                    STORY_GROUPS.forEach(g => {
+                        const collectedCount = g.parts.filter(pid => !!collectedStories[pid]).length;
+                        const row = document.createElement('div'); row.className = 'group';
+                        const meta = document.createElement('div'); meta.className = 'meta';
+                        const title = document.createElement('div'); title.className = 'title'; title.textContent = g.label;
+                        const count = document.createElement('div'); count.className = 'count'; count.textContent = `${collectedCount}/${g.parts.length}`;
+                        meta.appendChild(title); meta.appendChild(count);
+                        row.appendChild(meta);
+
+                        const preview = document.createElement('div');
+                        Object.assign(preview.style, { marginTop: '6px', opacity: '0.9' });
+                        if (collectedCount === 0) {
+                            preview.textContent = '잠금 — 아직 획득한 쪽지가 없습니다.';
+                        } else {
+                            const firstCollectedId = g.parts.find(pid => !!collectedStories[pid]);
+                            const txt = (collectedStories[firstCollectedId]?.text) || STORY_TEXTS[firstCollectedId];
+                            let excerpt = Array.isArray(txt) ? txt[0] : String(txt);
+                            preview.textContent = excerpt.slice(0, 80) + (excerpt.length > 80 ? '...' : '');
+                        }
+                        row.appendChild(preview);
+
+                        row.onclick = () => {
+                            if (g.parts.filter(pid => !!MazeGame.state.collectedStories[pid]).length === 0) {
+                                MazeGame.ui.showToast('획득한 쪽지가 없습니다.');
+                                return;
+                            }
+                            MazeGame.codex.showGroupOverlay(g);
+                            codexOverlay.style.display = 'none';
+                        };
+                        codexPanel.appendChild(row);
+                    });
+
+                    const close = document.createElement('div');
+                    close.style.marginTop = '8px';
+                    close.innerHTML = `<div style="text-align:right"><button class="primary" id="codexClose">닫기</button></div>`;
+                    codexPanel.appendChild(close);
+                    codexOverlay.style.display = 'flex';
+                    document.getElementById('codexClose').onclick = () => { codexOverlay.style.display = 'none'; };
+                }
+            },
+
+            /**
+             * 7. 저장소 (Storage) 관리
+             * - LocalStorage, SessionStorage 관련 로직을 담당합니다.
+             */
+            storage: {
+                loadStories() {
+                    try {
+                        const raw = localStorage.getItem(MazeGame.config.STORAGE_KEY);
+                        MazeGame.state.collectedStories = raw ? (JSON.parse(raw) || {}) : {};
+                    } catch (e) {
+                        console.warn('loadStories error', e);
+                        MazeGame.state.collectedStories = {};
+                    }
+                },
+                saveStories() {
+                    try {
+                        localStorage.setItem(MazeGame.config.STORAGE_KEY, JSON.stringify(MazeGame.state.collectedStories));
+                    } catch (e) {
+                        console.warn('saveStories', e);
+                    }
+                },
+                resetCollectedStories() {
+                    MazeGame.state.collectedStories = {};
+                    this.saveStories();
+                },
+                unlockNote(id) {
+                    if (!MazeGame.state.collectedStories[id]) {
+                        const txt = MazeGame.config.STORY_TEXTS[id] || '(기록 없음)';
+                        MazeGame.state.collectedStories[id] = { unlocked: true, text: txt };
+                        this.saveStories();
+                    }
+                },
+                buildDefaultSpawnOrder() {
+                    const order = new Array(15).fill(null);
+                    order[0] = 'siblings_1'; order[1] = 'siblings_2'; order[2] = 'siblings_3';
+                    order[3] = 'maid_1'; order[4] = 'maid_2'; order[5] = 'maid_3';
+                    order[12] = 'sibling_younger_1'; order[13] = 'sibling_younger_2'; order[14] = 'sibling_younger_3';
+
+                    const used = new Set(order.filter(Boolean));
+                    const remaining = MazeGame.config.ALL_NOTE_IDS.filter(id => !used.has(id));
+                    for (let i = remaining.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+                    }
+
+                    let idx = 0;
+                    for (let pos = 6; pos <= 11; pos++) { order[pos] = remaining[idx++] || null; }
+                    for (let i = 0; i < order.length; i++) if (!order[i] && idx < remaining.length) order[i] = remaining[idx++];
+                    return order;
+                },
+                saveLevel(lv) {
+                    localStorage.setItem('maze_current_level', lv);
+                },
+                loadLevel() {
+                    const v = parseInt(localStorage.getItem('maze_current_level') || '1', 10);
+                    MazeGame.state.level = v;
+                }
+                ,
+                // ensureSpawnOrder() {
+                //     try {
+                //         const raw = sessionStorage.getItem(MazeGame.config.SPAWN_KEY);
+                //         if (raw) {
+                //             const arr = JSON.parse(raw);
+                //             if (Array.isArray(arr) && arr.length >= 15) return arr.slice(0, 15);
+                //         }
+                //     } catch (e) { /* ignore */ }
+                //     const built = this.buildDefaultSpawnOrder();
+                //     try { sessionStorage.setItem(MazeGame.config.SPAWN_KEY, JSON.stringify(built)); } catch (e) { }
+                //     return built;
+                // },
+                ensureSpawnOrder() {
+                    // ✅ 이제 sessionStorage 대신 localStorage 사용 (세션 유지)
+                    try {
+                        const raw = localStorage.getItem(MazeGame.config.SPAWN_KEY);
+                        if (raw) {
+                            const arr = JSON.parse(raw);
+                            if (Array.isArray(arr) && arr.length >= 15) return arr.slice(0, 15);
+                        }
+                    } catch (e) { /* ignore */ }
+
+                    // 기본 순서 생성 후 저장
+                    const built = this.buildDefaultSpawnOrder();
+                    try {
+                        localStorage.setItem(MazeGame.config.SPAWN_KEY, JSON.stringify(built));
+                    } catch (e) { }
+                    return built;
+                },
+                // ✅ 레벨별 쪽지 매핑용 인덱스 관리 (새 함수 추가)
+                getSpawnIndex() {
+                    return parseInt(localStorage.getItem(MazeGame.config.SPAWN_INDEX_KEY) || '0', 10);
+                },
+                setSpawnIndex(idx) {
+                    localStorage.setItem(MazeGame.config.SPAWN_INDEX_KEY, String(idx));
+                },
+                advanceSpawnIndex() {
+                    const idx = this.getSpawnIndex();
+                    this.setSpawnIndex(idx + 1);
+                },
+
+                // ✅ 새 함수: 현재 레벨에 맞는 쪽지 반환
+                getCurrentNoteForLevel(level) {
+                    const order = this.ensureSpawnOrder();
+                    const idx = Math.min(level - 1, order.length - 1);
+                    return order[idx];
+                },
+                // resetSpawnSession() {
+                //     try {
+                //         sessionStorage.removeItem(MazeGame.config.SPAWN_KEY);
+                //         sessionStorage.removeItem(MazeGame.config.SPAWN_INDEX_KEY);
+                //     } catch (e) { }
+                // }
+                // ✅ 초기화 함수 수정 (sessionStorage → localStorage)
+                resetSpawnSession() {
+                    try {
+                        localStorage.removeItem(MazeGame.config.SPAWN_KEY);
+                        localStorage.removeItem(MazeGame.config.SPAWN_INDEX_KEY);
+                    } catch (e) { }
+                },
+                resetLevelProgress() {
+                    try {
+                        localStorage.removeItem('maze_current_level');
+                    } catch (e) { console.warn('resetLevelProgress error', e); }
+                },
+            },
+
+            /**
+             * 8. 입력 (Input) 관리
+             * - 키보드, 조이스틱 등 사용자 입력을 처리합니다.
+             */
+            input: {
+                init() {
+                    const { joystick } = MazeGame.dom;
+                    // Keyboard
+                    window.addEventListener('keydown', e => { MazeGame.state.keys[e.key.toLowerCase()] = true; });
+                    window.addEventListener('keyup', e => { MazeGame.state.keys[e.key.toLowerCase()] = false; });
+                    // Joystick
+                    joystick.addEventListener('touchstart', e => { e.preventDefault(); this.startJoy(e.touches[0].clientX, e.touches[0].clientY); });
+                    joystick.addEventListener('touchmove', e => { e.preventDefault(); this.updateJoy(e.touches[0].clientX, e.touches[0].clientY); });
+                    joystick.addEventListener('touchend', e => { e.preventDefault(); this.endJoy(); });
+                    joystick.addEventListener('mousedown', e => { e.preventDefault(); this.startJoy(e.clientX, e.clientY); });
+                    window.addEventListener('mousemove', e => { if (MazeGame.state.joyActive) this.updateJoy(e.clientX, e.clientY); });
+                    window.addEventListener('mouseup', e => { if (MazeGame.state.joyActive) this.endJoy(); });
+
+                    this.initJoyCenter();
+                    window.addEventListener('resize', this.initJoyCenter);
+                },
+                initJoyCenter() {
+                    const r = MazeGame.dom.joystick.getBoundingClientRect();
+                    MazeGame.state.joyCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+                },
+                setStickPos(dx, dy) {
+                    const max = (MazeGame.dom.joystick.clientWidth / 2 - MazeGame.dom.stick.clientWidth / 2 - 6);
+                    const tx = Math.max(-1, Math.min(1, dx)) * max;
+                    const ty = Math.max(-1, Math.min(1, dy)) * max;
+                    MazeGame.dom.stick.style.transform = `translate(${tx}px, ${ty}px)`;
+                },
+                startJoy(x, y) {
+                    MazeGame.state.joyActive = true;
+                    this.initJoyCenter();
+                    this.updateJoy(x, y);
+                },
+                updateJoy(x, y) {
+                    const { joyActive, joyCenter, speed } = MazeGame.state;
+                    if (!joyActive || !joyCenter) return;
+                    let dx = x - joyCenter.x;
+                    let dy = y - joyCenter.y;
+                    const distv = Math.hypot(dx, dy);
+                    const max = MazeGame.dom.joystick.clientWidth / 2;
+                    if (distv > max) { dx = dx / distv * max; dy = dy / distv * max; }
+                    const nx = dx / max, ny = dy / max;
+                    MazeGame.state.player.vx = nx * speed;
+                    MazeGame.state.player.vy = ny * speed;
+                    this.setStickPos(nx, ny);
+                },
+                endJoy() {
+                    MazeGame.state.joyActive = false;
+                    MazeGame.state.player.vx = 0;
+                    MazeGame.state.player.vy = 0;
+                    this.setStickPos(0, 0);
+                }
+            },
+
+            /**
+             * 9. 게임 엔진 (Engine)
+             * - 게임의 핵심 로직(메인 루프, 렌더링, 미로 생성, 레벨 관리 등)을 담당합니다.
+             */
+            engine: {
+                update(now) {
+                    try {
+                        const { state, utils } = MazeGame;
+
+                        // ✅ 게임 중단 상태라면 루프 종료
+                        if (!state.isRunning) return;
+
+                        const dt = Math.min(0.05, (now - state.lastTime) / 1000);
+                        state.lastTime = now;
+
+                        // 입력 처리
+                        if (!state.joyActive) {
+                            let ix = 0, iy = 0;
+                            if (state.keys['arrowup'] || state.keys['w']) iy -= 1;
+                            if (state.keys['arrowdown'] || state.keys['s']) iy += 1;
+                            if (state.keys['arrowleft'] || state.keys['a']) ix -= 1;
+                            if (state.keys['arrowright'] || state.keys['d']) ix += 1;
+                            if (ix !== 0 || iy !== 0) {
+                                const len = Math.hypot(ix, iy) || 1;
+                                state.player.vx = (ix / len) * state.speed;
+                                state.player.vy = (iy / len) * state.speed;
+                            } else { state.player.vx = 0; state.player.vy = 0; }
+                        }
+
+                        // 이동 및 충돌
+                        let nextX = state.player.x + state.player.vx * dt;
+                        let nextY = state.player.y + state.player.vy * dt;
+                        if (this.canMoveToPos(nextX, state.player.y)) { state.player.x = nextX; } else { state.player.vx = 0; }
+                        if (this.canMoveToPos(state.player.x, nextY)) { state.player.y = nextY; } else { state.player.vy = 0; }
+
+                        // 게임 상태 업데이트
+                        this.checkTimeout();
+                        this.revealAround(state.player.x, state.player.y);
+                        this.tryCollectItems();
+                        this.checkGoal();
+
+                        // 렌더링
+                        this.draw(now);
+                        this.drawMiniMap();
+
+                        requestAnimationFrame(this.update.bind(this));
+                    } catch (err) {
+                        console.error('게임 루프 에러:', err);
+                        MazeGame.state.lastTime = performance.now();
+                        requestAnimationFrame(this.update.bind(this));
+                    }
+                },
+
+                draw(nowTs) {
+                    const { ctx, gameCanvas } = MazeGame.dom;
+                    const { player, tileSize, rows, cols, maze, goal, items, blockImages, itemImages } = MazeGame.state;
+                    ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+                    const offsetX = gameCanvas.width / 2 - player.x * tileSize;
+                    const offsetY = gameCanvas.height / 2 - player.y * tileSize;
+
+                    // 벽 렌더링 최적화
+                    const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+                    for (let y = 0; y < rows; y++) {
+                        for (let x = 0; x < cols; x++) {
+                            if (maze[y]?.[x] === 1 && !visited[y][x]) {
+                                let drawn = false;
+
+                                // 1. 가장 큰 블록부터 우선적으로 확인 (가로 1x3)
+                                if (x + 2 < cols && maze[y][x + 1] === 1 && maze[y][x + 2] === 1 && !visited[y][x + 1] && !visited[y][x + 2]) {
+                                    ctx.drawImage(blockImages["1x3"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize * 3, tileSize);
+                                    visited[y][x] = visited[y][x + 1] = visited[y][x + 2] = true;
+                                    drawn = true;
+                                }
+                                // 2. 가로 1x2 확인
+                                else if (x + 1 < cols && maze[y][x + 1] === 1 && !visited[y][x + 1]) {
+                                    ctx.drawImage(blockImages["1x2"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize * 2, tileSize);
+                                    visited[y][x] = visited[y][x + 1] = true;
+                                    drawn = true;
+                                }
+                                // 3. 세로 3x1 확인
+                                else if (y + 2 < rows && maze[y + 1]?.[x] === 1 && maze[y + 2]?.[x] === 1 && !visited[y + 1]?.[x] && !visited[y + 2]?.[x]) {
+                                    ctx.drawImage(blockImages["3x1"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize * 3);
+                                    visited[y][x] = visited[y + 1][x] = visited[y + 2][x] = true;
+                                    drawn = true;
+                                }
+                                // 4. 세로 2x1 확인
+                                else if (y + 1 < rows && maze[y + 1]?.[x] === 1 && !visited[y + 1]?.[x]) {
+                                    ctx.drawImage(blockImages["2x1"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize * 2);
+                                    visited[y][x] = visited[y + 1][x] = true;
+                                    drawn = true;
+                                }
+
+                                // 5. 맞는 블록이 없으면 기본 1x1 블록을 그립니다.
+                                if (!drawn) {
+                                    ctx.drawImage(blockImages["1x1"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize);
+                                    visited[y][x] = true;
+                                }
+                                // if (maze[y]?.[x] === 1 && !visited[y][x]) {
+                                //     let lenX = 1; while (x + lenX < cols && lenX < 3 && maze[y][x + lenX] === 1 && !visited[y][x + lenX]) lenX++;
+                                //     if (lenX > 1) {
+                                //         ctx.drawImage(blockImages[`1x${lenX}`] || blockImages["1x1"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize * lenX, tileSize);
+                                //         for (let i = 0; i < lenX; i++) visited[y][x + i] = true;
+                                //         continue;
+                                //     }
+                                //     let lenY = 1; while (y + lenY < rows && maze[y + lenY]?.[x] === 1 && !visited[y + lenY][x]) lenY++;
+                                //     if (lenY > 1 && lenY <= 3) {
+                                //         ctx.drawImage(blockImages[`${lenY}x1`] || blockImages["1x1"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize * lenY);
+                                //         for (let i = 0; i < lenY; i++) visited[y + i][x] = true;
+                                //         continue;
+                                //     }
+                                //     ctx.drawImage(blockImages["1x1"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize);
+                                //     visited[y][x] = true;
+                            } else if (maze[y]?.[x] === 0) {
+                                ctx.fillStyle = "white";
+                                ctx.fillRect(x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize);
+                            }
+                        }
+                    }
+
+                    // 목표, 아이템, 플레이어 렌더링
+                    ctx.fillStyle = "green";
+                    ctx.fillRect(goal.x * tileSize + offsetX, goal.y * tileSize + offsetY, tileSize, tileSize);
+
+                    for (const it of items) {
+                        const img = itemImages[it.type];
+                        const size = tileSize * 0.8;
+                        const px = it.x * tileSize + tileSize / 2 - size / 2 + offsetX;
+                        const py = it.y * tileSize + tileSize / 2 - size / 2 + offsetY;
+                        if (img) ctx.drawImage(img, px, py, size, size);
+                    }
+
+                    const psize = tileSize * player.size;
+                    ctx.fillStyle = "red";
+                    ctx.fillRect(gameCanvas.width / 2 - psize / 2, gameCanvas.height / 2 - psize / 2, psize, psize);
+
+                    const rem = this.getRemainingSeconds();
+                    this.drawTimer(rem);
+                    this.drawUrgency(nowTs, rem);
+                },
+
+                drawMiniMap() {
+                    const { miniCtx, miniCanvas } = MazeGame.dom;
+                    const { cols, rows, visitedMap, maze, goal, items, player } = MazeGame.state;
+                    const w = miniCanvas.width, h = miniCanvas.height;
+                    const cellW = w / cols, cellH = h / rows;
+
+                    miniCtx.fillStyle = '#030303'; miniCtx.fillRect(0, 0, w, h);
+
+                    for (let y = 0; y < rows; y++) {
+                        for (let x = 0; x < cols; x++) {
+                            if (visitedMap[y]?.[x] && maze[y]?.[x] === 0) {
+                                miniCtx.fillStyle = '#bfbfbf';
+                                miniCtx.fillRect(x * cellW, y * cellH, cellW, cellH);
+                            }
+                        }
+                    }
+
+                    miniCtx.fillStyle = '#2ecc71'; miniCtx.fillRect(goal.x * cellW + cellW * 0.15, goal.y * cellH + cellH * 0.15, cellW * 0.7, cellH * 0.7);
+
+                    for (const it of items) {
+                        if (visitedMap[it.y]?.[it.x]) {
+                            miniCtx.beginPath();
+                            miniCtx.fillStyle = (it.type === 'key') ? '#ffcc00' : '#7f5cff';
+                            miniCtx.arc((it.x + 0.5) * cellW, (it.y + 0.5) * cellH, Math.min(cellW, cellH) * 0.25, 0, Math.PI * 2);
+                            miniCtx.fill();
+                        }
+                    }
+                    miniCtx.fillStyle = '#ff4b4b';
+                    miniCtx.beginPath();
+                    miniCtx.arc(player.x * cellW, player.y * cellH, Math.min(cellW, cellH) * 0.32, 0, Math.PI * 2);
+                    miniCtx.fill();
+                },
+
+                drawTimer(rem) {
+                    const { ctx } = MazeGame.dom;
+                    const text = `${Math.floor(rem / 60)}:${String(Math.floor(rem) % 60).padStart(2, '0')}`;
+                    ctx.save();
+                    ctx.font = '18px sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillStyle = rem <= 10 ? 'tomato' : '#fff';
+                    ctx.fillText(`시간: ${text}`, 12, 14);
+                    ctx.restore();
+                },
+
+                drawUrgency(nowTs, rem) {
+                    if (rem > 20) return;
+                    const { ctx, gameCanvas } = MazeGame.dom;
+                    const p = Math.max(0, Math.min(1, rem / 20));
+                    const startR = Math.max(gameCanvas.width, gameCanvas.height) * 0.9;
+                    const endR = Math.min(gameCanvas.width, gameCanvas.height) * 0.12;
+                    const radius = endR + (startR - endR) * p;
+                    const pulseSpeed = 6 + (1 - p) * 18;
+                    const pulseAmount = 1 + 0.06 * (1 - p) * Math.sin(nowTs / 1000 * pulseSpeed);
+                    const drawR = radius * pulseAmount;
+                    const cx = gameCanvas.width / 2, cy = gameCanvas.height / 2;
+
+                    ctx.save();
+                    ctx.fillStyle = `rgba(120,10,10,${0.22 + (1 - p) * 0.28})`;
+                    ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.beginPath(); ctx.arc(cx, cy, drawR, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.beginPath(); ctx.arc(cx, cy, drawR, 0, Math.PI * 2);
+                    ctx.lineWidth = Math.max(3, (1 - p) * 18);
+                    ctx.strokeStyle = `rgba(255,80,80,${Math.min(1, 0.8 - p * 0.5 + (1 - p) * 0.2)})`;
+                    ctx.stroke();
+                    ctx.beginPath(); ctx.arc(cx, cy, drawR - (ctx.lineWidth * 0.6), 0, Math.PI * 2);
+                    ctx.lineWidth = 1.2;
+                    ctx.strokeStyle = `rgba(255,200,200,${0.18 + (1 - p) * 0.25})`;
+                    ctx.stroke();
+                    ctx.restore();
+                },
+                canMoveToPos(x, y) {
+                    const { player, maze } = MazeGame.state;
+                    const { inBounds } = MazeGame.utils;
+                    const half = player.size / 2;
+                    const corners = [{ x: x - half, y: y - half }, { x: x + half, y: y - half }, { x: x - half, y: y + half }, { x: x + half, y: y + half }];
+                    for (const c of corners) {
+                        const tx = Math.floor(c.x), ty = Math.floor(c.y);
+                        if (!inBounds(tx, ty) || maze[ty]?.[tx] === 1) return false;
+                    }
+                    return true;
+                },
+
+                tryCollectItems() {
+                    const { state, utils, ui, storage } = MazeGame;
+                    for (let i = state.items.length - 1; i >= 0; i--) {
+                        const it = state.items[i];
+                        if (utils.dist(state.player.x, state.player.y, it.x + 0.5, it.y + 0.5) < 0.8) {
+                            it.collected = true;
+                            state.items.splice(i, 1);
+                            if (it.type === 'key') {
+                                state.hasKey = true;
+                                storage.unlockNote('key');
+                                ui.showToast('물자를 얻었다.');
+                                // } else if (it.type === 'note') {
+                                //     state.hasNoteInCurrentLevel = true;
+                                //     // 레벨 클리어 시 저장되므로 여기서는 임시 저장만 함 (원본 로직 유지)
+                                //     // storage.unlockNote(it.storyId);
+                                //     ui.showToast('쪽지를 얻었다.');
+                            } else if (it.type === 'note') {
+                                state.hasNoteInCurrentLevel = true;
+                                state.currentLevelNoteId = it.storyId;
+
+                                // ✅ 쪽지 즉시 획득 (도감 반영)
+                                storage.unlockNote(it.storyId);
+
+                                ui.showToast('쪽지를 얻었다.');
+                            } else {
+                                ui.showToast('아이템 획득');
+                            }
+                            ui.updateHud();
+                        }
+                    }
+                },
+
+                checkGoal() {
+                    const { state, utils, ui, storage } = MazeGame;
+                    if (state.levelCleared) return;
+
+                    if (utils.dist(state.player.x, state.player.y, state.goal.x + 0.5, state.goal.y + 0.5) < 0.8) {
+                        if (state.hasKey) {
+                            state.levelCleared = true;
+                            MazeGame.storage.advanceSpawnIndex(); // ✅ 다음 단계로 이동
+                            MazeGame.storage.saveLevel(state.level + 1); // ✅ 다음 레벨 저장
+                            const nextLevel = state.level + 1;
+                            const MAX_LEVEL = 15;
+                            if (state.level >= MAX_LEVEL) {
+                                ui.showLoadingOverlay('엔딩을 준비 중입니다...');
+                                setTimeout(() => {
+                                    ui.hideOverlay();
+                                    storage.unlockNote('ending');
+                                    ui.showStoryOverlay('엔딩', MazeGame.config.STORY_TEXTS.ending[0], 0);
+                                }, 800);
+                                return;
+                            }
+                            ui.showLoadingOverlay(`레벨 ${nextLevel} 로딩 중...`);
+                            setTimeout(() => {
+                                state.level = nextLevel;
+                                this.startLevel(state.level);
+                                ui.hideOverlay();
+                                state.levelCleared = false;
+                                state.lastTime = performance.now();
+                            }, 700);
+                        } else {
+                            ui.showToast("아이템이 부족합니다! 물자를 모아야 합니다.", 1800);
+                        }
+                    }
+                },
+                getRemainingSeconds: () => Math.max(0, MazeGame.state.timeLimitSeconds - ((Date.now() - MazeGame.state.startTime) / 1000)),
+
+                handleTimeUp() {
+                    if (MazeGame.state.timeUp) return;
+                    MazeGame.state.timeUp = true;
+                    const elapsedTotal = ((Date.now() - MazeGame.state.startTime) / 1000).toFixed(1);
+                    MazeGame.ui.showGameOverOverlay({ title: '시간 초과!', message: `플레이타임: ${elapsedTotal}초\n레벨을 다시 시작하시겠습니까?` });
+                },
+                checkTimeout() {
+                    if (this.getRemainingSeconds() <= 0) this.handleTimeUp();
+                },
+
+                revealAround(px, py) {
+                    const { state, utils } = MazeGame;
+                    const cx = Math.floor(px), cy = Math.floor(py);
+                    const revealRadius = 3;
+                    for (let dy = -revealRadius; dy <= revealRadius; dy++) {
+                        for (let dx = -revealRadius; dx <= revealRadius; dx++) {
+                            const x = cx + dx, y = cy + dy;
+                            if (utils.inBounds(x, y)) state.revealMap[y][x] = true;
+                        }
+                    }
+                    if (utils.inBounds(cx, cy) && state.maze[cy][cx] === 0) state.visitedMap[cy][cx] = true;
+                },
+
+                generateMaze(w, h) {
+                    const { state, utils } = MazeGame;
+                    state.cols = w; state.rows = h;
+                    state.maze = Array.from({ length: h }, () => Array(w).fill(1));
+                    const stack = [{ x: 1, y: 1 }];
+                    state.maze[1][1] = 0;
+                    const deltas = [[0, -2], [2, 0], [0, 2], [-2, 0]];
+                    while (stack.length) {
+                        const cur = stack[stack.length - 1];
+                        const neighbors = deltas.filter(d => {
+                            const nx = cur.x + d[0], ny = cur.y + d[1];
+                            return utils.inBounds(nx, ny) && state.maze[ny][nx] === 1;
+                        });
+                        if (neighbors.length === 0) { stack.pop(); continue; }
+                        const ch = neighbors[Math.floor(Math.random() * neighbors.length)];
+                        state.maze[cur.y + ch[1] / 2][cur.x + ch[0] / 2] = 0;
+                        state.maze[cur.y + ch[1]][cur.x + ch[0]] = 0;
+                        stack.push({ x: cur.x + ch[0], y: cur.y + ch[1] });
+                    }
+
+                    const possibleGoals = [];
+                    for (let x = 1; x < w - 1; x++) { if (state.maze[1][x] === 0) possibleGoals.push({ x, y: 0 }); }
+                    for (let x = 1; x < w - 1; x++) { if (state.maze[h - 2][x] === 0) possibleGoals.push({ x, y: h - 1 }); }
+                    for (let y = 1; y < h - 1; y++) { if (state.maze[y][1] === 0) possibleGoals.push({ x: 0, y }); }
+                    for (let y = 1; y < h - 1; y++) { if (state.maze[y][w - 2] === 0) possibleGoals.push({ x: w - 1, y }); }
+                    state.goal = possibleGoals.length ? possibleGoals[Math.floor(Math.random() * possibleGoals.length)] : { x: w - 2, y: h - 2 };
+                    state.maze[state.goal.y][state.goal.x] = 2;
+
+                    state.revealMap = Array.from({ length: h }, () => Array(w).fill(false));
+                    state.visitedMap = Array.from({ length: h }, () => Array(w).fill(false));
+                },
+
+                findRandomPathCell(avoidNearStart = true) {
+                    const { state, utils } = MazeGame;
+                    for (let tries = 0; tries < 5000; tries++) {
+                        const x = utils.randInt(1, state.cols - 2);
+                        const y = utils.randInt(1, state.rows - 2);
+                        if (state.maze[y][x] !== 0) continue;
+                        if (avoidNearStart && (Math.abs(x - 1) < 4 && Math.abs(y - 1) < 4)) continue;
+                        if (avoidNearStart && (Math.abs(x - state.goal.x) < 4 && Math.abs(y - state.goal.y) < 4)) continue;
+                        return { x, y };
+                    }
+                    return { x: 1, y: 1 }; // Fallback
+                },
+
+                placeItemsForLevel() {
+                    const { state, storage, config } = MazeGame;
+                    state.items = [];
+                    const k = this.findRandomPathCell(true);
+                    state.items.push({ type: 'key', x: k.x, y: k.y, collected: false, storyId: 'key' });
+
+                    // const spawnOrder = storage.ensureSpawnOrder();
+                    // let noteIdToSpawn = spawnOrder.find(id => id && !state.collectedStories[id]);
+                    const noteIdToSpawn = storage.getCurrentNoteForLevel(state.level);
+                    if (!noteIdToSpawn) {
+                        const uncollected = config.ALL_NOTE_IDS.filter(id => !state.collectedStories[id]);
+                        noteIdToSpawn = uncollected.length ? uncollected[Math.floor(Math.random() * uncollected.length)] : config.ALL_NOTE_IDS[0];
+                    }
+                    state.currentLevelNoteId = noteIdToSpawn;
+                    const p = this.findRandomPathCell(true);
+                    state.items.push({ type: 'note', x: p.x, y: p.y, collected: false, storyId: noteIdToSpawn, message: config.STORY_TEXTS[noteIdToSpawn] });
+                },
+
+                // in MazeGame.engine
+                // startLevel(lv) {
+                //     // 이 함수가 Promise를 반환하도록 수정합니다.
+                //     return new Promise(resolve => {
+                //         const { state, ui, utils } = MazeGame;
+                //         state.hasKey = false;
+                //         state.hasNoteInCurrentLevel = false;
+
+                //         const PATHS = { ROAD: "img/c/tiles_road/", MART: "img/c/tiles_mart/", MANSION: "img/c/tiles_mansion/", RUINS: "img/c/tiles_ruins/", OUTSIDE: "img/c/tiles_outside/" };
+                //         const TILE_SET_SEQUENCE = [null, PATHS.ROAD, PATHS.MART, PATHS.ROAD, PATHS.MANSION, PATHS.ROAD, PATHS.RUINS, PATHS.RUINS, PATHS.RUINS, PATHS.RUINS];
+                //         const basePath = TILE_SET_SEQUENCE[lv] || PATHS.RUINS;
+
+                //         const loadPromises = Object.keys(state.blockImages).map(key => {
+                //             return new Promise(res => {
+                //                 state.blockImages[key].onload = res;
+                //                 state.blockImages[key].src = `${basePath}block_${key}.png`;
+                //             });
+                //         });
+
+                //         Promise.all(loadPromises).then(() => {
+                //             state.level = lv;
+                //             state.cols = 21 + (lv - 1) * 2;
+                //             state.rows = 21 + (lv - 1) * 2;
+                //             if (state.cols % 2 === 0) state.cols++;
+                //             if (state.rows % 2 === 0) state.rows++;
+
+                //             state.timeLimitSeconds = utils.getTimeLimitForLevel(lv);
+                //             state.startTime = Date.now(); // startTime이 여기서 설정되고
+                //             state.timeUp = false;
+
+                //             this.generateMaze(state.cols, state.rows);
+                //             Object.assign(state.player, { x: 1.5, y: 1.5, vx: 0, vy: 0 });
+                //             state.levelCleared = false;
+                //             this.placeItemsForLevel();
+                //             this.revealAround(state.player.x, state.player.y);
+                //             ui.updateHud();
+
+                //             resolve(); // 모든 준비가 끝났다고 알려줍니다.
+                //         });
+                //     });
+                // },
+                startLevel(lv) {
+                    return new Promise(resolve => {
+                        // ✅ 혹시 남아있을 수 있는 오버레이 닫기
+                        MazeGame.dom.overlay.style.display = 'none';
+                        MazeGame.dom.overlayPanel.innerHTML = '';
+
+                        const { state, ui, utils } = MazeGame;
+                        state.hasKey = false;
+                        state.hasNoteInCurrentLevel = false;
+
+                        const PATHS = {
+                            ROAD: "img/c/tiles_road/",
+                            MART: "img/c/tiles_mart/",
+                            MANSION: "img/c/tiles_mansion/",
+                            RUINS: "img/c/tiles_ruins/",
+                            OUTSIDE: "img/c/tiles_outside/"
+                        };
+                        const TILE_SET_SEQUENCE = [
+                            null,
+                            PATHS.ROAD,
+                            PATHS.MART,
+                            PATHS.ROAD,
+                            PATHS.MANSION,
+                            PATHS.ROAD,
+                            PATHS.RUINS,
+                            PATHS.RUINS,
+                            PATHS.RUINS,
+                            PATHS.RUINS
+                        ];
+                        const basePath = TILE_SET_SEQUENCE[lv] || PATHS.RUINS;
+
+                        // ✅ block 이미지 로딩 (fallback 및 에러 체크 추가)
+                        const keys = ["1x1", "1x2", "1x3", "2x1", "3x1"];
+                        const loadPromises = keys.map(key => {
+                            return new Promise(resolveImg => {
+                                const img = new Image();
+                                img.onload = () => {
+                                    state.blockImages[key] = img;
+                                    resolveImg();
+                                };
+                                img.onerror = () => {
+                                    console.warn(`⚠️ 블록 이미지 누락: ${basePath}block_${key}.png — 기본 block_1x1.png 사용`);
+                                    img.src = `${basePath}block_1x1.png`; // fallback
+                                    state.blockImages[key] = img;
+                                    resolveImg();
+                                };
+                                img.src = `${basePath}block_${key}.png`;
+                            });
+                        });
+
+                        // 모든 이미지 로드 완료 후 실행
+                        Promise.all(loadPromises).then(() => {
+                            state.level = lv;
+                            state.cols = 21 + (lv - 1) * 2;
+                            state.rows = 21 + (lv - 1) * 2;
+                            if (state.cols % 2 === 0) state.cols++;
+                            if (state.rows % 2 === 0) state.rows++;
+
+                            state.timeLimitSeconds = utils.getTimeLimitForLevel(lv);
+                            state.startTime = Date.now();
+                            state.timeUp = false;
+
+                            this.generateMaze(state.cols, state.rows);
+                            Object.assign(state.player, { x: 1.5, y: 1.5, vx: 0, vy: 0 });
+                            state.levelCleared = false;
+                            this.placeItemsForLevel();
+                            this.revealAround(state.player.x, state.player.y);
+                            ui.updateHud();
+
+                            resolve();
+                        });
+                    });
+                },
+
+                // startLevel(lv) {
+                //     const { state, ui, utils } = MazeGame;
+                //     state.hasKey = false;
+                //     state.hasNoteInCurrentLevel = false;
+
+                //     const PATHS = { ROAD: "img/c/tiles_road/", MART: "img/c/tiles_mart/", MANSION: "img/c/tiles_mansion/", RUINS: "img/c/tiles_ruins/", OUTSIDE: "img/c/tiles_outside/" };
+                //     const TILE_SET_SEQUENCE = [null, PATHS.ROAD, PATHS.MART, PATHS.ROAD, PATHS.MANSION, PATHS.ROAD, PATHS.RUINS, PATHS.RUINS, PATHS.RUINS, PATHS.RUINS];
+                //     const basePath = TILE_SET_SEQUENCE[lv] || PATHS.RUINS;
+
+                //     const loadPromises = Object.keys(state.blockImages).map(key => {
+                //         return new Promise(resolve => {
+                //             state.blockImages[key].onload = resolve;
+                //             state.blockImages[key].src = `${basePath}block_${key}.png`;
+                //         });
+                //     });
+
+                //     Promise.all(loadPromises).then(() => {
+                //         state.level = lv;
+                //         state.cols = 21 + (lv - 1) * 2;
+                //         state.rows = 21 + (lv - 1) * 2;
+                //         if (state.cols % 2 === 0) state.cols++;
+                //         if (state.rows % 2 === 0) state.rows++;
+
+                //         state.timeLimitSeconds = utils.getTimeLimitForLevel(lv);
+                //         state.startTime = Date.now();
+                //         state.timeUp = false;
+
+                //         this.generateMaze(state.cols, state.rows);
+                //         Object.assign(state.player, { x: 1.5, y: 1.5, vx: 0, vy: 0 });
+                //         state.levelCleared = false;
+                //         this.placeItemsForLevel();
+                //         this.revealAround(state.player.x, state.player.y);
+                //         ui.updateHud();
+                //     });
+                // },
+
+                showIntroStart() {
+                    const { overlayPanel, overlay } = MazeGame.dom;
+                    overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>깊은 미궁 속으로 발을 내딛었다. 시작 버튼을 눌러 탐험을 시작하세요.</p><div class="actions"><button class="primary" id="startBtn">게임 시작</button></div>`;
+                    overlay.style.display = 'flex';
+                    // document.getElementById('startBtn').onclick = () => {
+                    //     const introText = MazeGame.config.STORY_TEXTS.intro[0];
+                    //     overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>${introText}</p>`;
+                    //     MazeGame.storage.unlockNote('intro');
+                    //     setTimeout(() => {
+                    //         overlay.style.display = 'none';
+                    //         MazeGame.state.isRunning = true; // ✅ 루프 다시 켜기
+                    //         this.startLevel(1);
+                    //         requestAnimationFrame(this.update.bind(this));
+                    //     }, 1200);
+                    // };
+                    // document.getElementById('startBtn').onclick = () => {
+                    //     const introText = MazeGame.config.STORY_TEXTS.intro[0];
+                    //     overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>${introText}</p>`;
+                    //     MazeGame.storage.unlockNote('intro');
+
+                    //     setTimeout(() => {
+                    //         // ✅ 오버레이 완전 닫기
+                    //         overlay.style.display = 'none';
+                    //         overlayPanel.innerHTML = '';
+
+                    //         // ✅ 루프 재시작 준비
+                    //         MazeGame.state.isRunning = true;
+                    //         MazeGame.state.timeUp = false;
+
+                    //         MazeGame.engine.startLevel(1).then(() => {
+                    //             // ✅ 안전하게 루프 시작
+                    //             requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
+                    //         });
+                    //     }, 1200);
+                    // };
+                    document.getElementById('startBtn').onclick = () => {
+                        const introText = MazeGame.config.STORY_TEXTS.intro[0];
+                        overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>${introText}</p>`;
+                        MazeGame.storage.unlockNote('intro');
+
+                        setTimeout(() => {
+                            overlay.style.display = 'none';
+                            overlayPanel.innerHTML = '';
+
+                            // ✅ 진행 중 레벨 불러오기
+                            MazeGame.storage.loadLevel();
+
+                            // ✅ 루프 다시 시작
+                            MazeGame.state.isRunning = true;
+                            MazeGame.state.timeUp = false;
+
+                            MazeGame.engine.startLevel(MazeGame.state.level).then(() => {
+                                requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
+                            });
+                        }, 1200);
+                    };
+
+                }
+            },
+
+            /**
+             * 10. 초기화 (Initialization)
+             * - 게임 시작에 필요한 모든 요소를 설정하고 실행합니다.
+             */
+            init() {
+                // DOM 요소 캐싱
+                this.dom = {
+                    gameCanvas: document.getElementById('game'),
+                    ctx: document.getElementById('game').getContext('2d'),
+                    miniCanvas: document.getElementById('miniMap'),
+                    miniCtx: document.getElementById('miniMap').getContext('2d'),
+                    overlay: document.getElementById('overlay'),
+                    overlayPanel: document.getElementById('overlayPanel'),
+                    codexOverlay: document.getElementById('codexOverlay'),
+                    codexPanel: document.getElementById('codexPanel'),
+                    codexBtn: document.getElementById('codexBtn'),
+                    homeBtn: document.getElementById('homeBtn'),
+                    freshStartBtn: document.getElementById('freshStartBtn'),
+                    levelText: document.getElementById('levelText'),
+                    itemKeyEl: document.getElementById('itemKeyEl'),
+                    itemCompassEl: document.getElementById('itemCompassEl'),
+                    joystick: document.getElementById('joystick'),
+                    stick: document.getElementById('stick')
+                };
+
+                // 이미지 객체 초기화
+                this.state.itemImages["note"].src = "img/item/Letter.png";
+                this.state.itemImages["key"].src = "img/item/Bread.png";
+                ["1x1", "1x2", "1x3", "2x1", "3x1"].forEach(key => this.state.blockImages[key] = new Image());
+
+                // 이벤트 리스너 바인딩
+                document.getElementById('resetSpawn').addEventListener('click', () => {
+                    this.storage.resetSpawnSession();
+                    this.ui.showToast('세션 스폰 순서 초기화 완료.');
+                });
+                this.dom.codexBtn.addEventListener('click', () => this.codex.open());
+                this.dom.homeBtn.addEventListener('click', () => this.engine.showIntroStart());
+                this.dom.freshStartBtn.addEventListener('click', () => {
+                    if (!confirm('정말 처음부터 시작하시겠습니까? (도감/획득한 쪽지 모두 초기화됩니다)')) return;
+                    this.storage.resetCollectedStories();
+                    this.storage.resetSpawnSession();
+                    this.storage.resetLevelProgress(); // ✅ 레벨 초기화 추가
+                    this.ui.updateHud();
+                    this.ui.showToast('도감이 초기화되었습니다.');
+                    this.engine.showIntroStart();
+                });
+
+                // 초기 데이터 로드 및 설정
+                this.storage.loadStories();
+                this.storage.loadLevel(); // ✅ 마지막 레벨 불러오기
+                this.input.init();
+                this.ui.updateHud();
+                this.state.lastTime = performance.now();
+
+                // 게임 시작
+                if (!this.state.collectedStories['intro']) {
+                    this.engine.showIntroStart();
+                } else {
+                    // startLevel()이 완료되기를 기다린 후, 게임 루프를 시작합니다.
+                    this.engine.startLevel(this.state.level).then(() => {
+                        requestAnimationFrame(this.engine.update.bind(this.engine));
+                    });
+                }
+                // // 게임 시작
+                // if (!this.state.collectedStories['intro']) {
+                //     this.engine.showIntroStart();
+                // } else {
+                //     this.engine.startLevel(this.state.level);
+                //     requestAnimationFrame(this.engine.update.bind(this.engine));
+                // }
+
+                // 디버그용 전역 접근
+                window._GAME = {
+                    getState: () => this.state,
+                    resetStories: () => { this.storage.resetCollectedStories(); alert('stories reset'); },
+                    resetSpawnSession: () => { this.storage.resetSpawnSession(); alert('spawn session reset'); }
+                };
+            }
+        };
+
+        // DOM이 로드된 후 게임을 초기화합니다.
+        window.addEventListener('DOMContentLoaded', () => {
+            MazeGame.init();
+        });
+    </script>
+</body>
+
+</html>
