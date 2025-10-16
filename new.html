@@ -110,6 +110,10 @@
         .hud-actions button.primary {
             background: #3b82f6;
         }
+
+        #stick {
+            transition: left 0.15s ease-out, top 0.15s ease-out;
+        }
     </style>
 </head>
 
@@ -660,7 +664,20 @@
                     // Joystick
                     joystick.addEventListener('touchstart', e => { e.preventDefault(); this.startJoy(e.touches[0].clientX, e.touches[0].clientY); });
                     joystick.addEventListener('touchmove', e => { e.preventDefault(); this.updateJoy(e.touches[0].clientX, e.touches[0].clientY); });
-                    joystick.addEventListener('touchend', e => { e.preventDefault(); this.endJoy(); });
+                    stick.addEventListener('touchend', e => {
+                        e.preventDefault();
+                        MazeGame.state.joyActive = false;
+
+                        // ✅ 중앙 복귀 (사라지지 않음)
+                        stick.style.left = '50%';
+                        stick.style.top = '50%';
+                        stick.style.transform = 'translate(-50%, -50%)';
+
+                        // ✅ 조이스틱은 계속 표시 유지
+                        // joystick.style.display = 'none'; ← 이거 제거!
+                    });
+
+                    // joystick.addEventListener('touchend', e => { e.preventDefault(); this.endJoy(); });
                     joystick.addEventListener('mousedown', e => { e.preventDefault(); this.startJoy(e.clientX, e.clientY); });
                     window.addEventListener('mousemove', e => { if (MazeGame.state.joyActive) this.updateJoy(e.clientX, e.clientY); });
                     window.addEventListener('mouseup', e => { if (MazeGame.state.joyActive) this.endJoy(); });
