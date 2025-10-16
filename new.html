@@ -242,6 +242,11 @@
                 blockImages: {},
                 itemImages: { "note": new Image(), "key": new Image() },
                 isRunning: true,
+
+                // player
+                playerImages: { up: new Image(), down: new Image(), left: new Image(), right: new Image() },
+                // 기본 방향 (아무 입력 없을 때)
+                playerDirection: "down",
             },
 
             /**
@@ -740,49 +745,114 @@
                     try {
                         const { state, utils } = MazeGame;
 
-                        // ✅ 게임 중단 상태라면 루프 종료
+                        // 중단 조건
                         if (!state.isRunning) return;
 
                         const dt = Math.min(0.05, (now - state.lastTime) / 1000);
                         state.lastTime = now;
 
-                        // 입력 처리
-                        if (!state.joyActive) {
-                            let ix = 0, iy = 0;
-                            if (state.keys['arrowup'] || state.keys['w']) iy -= 1;
-                            if (state.keys['arrowdown'] || state.keys['s']) iy += 1;
-                            if (state.keys['arrowleft'] || state.keys['a']) ix -= 1;
-                            if (state.keys['arrowright'] || state.keys['d']) ix += 1;
-                            if (ix !== 0 || iy !== 0) {
-                                const len = Math.hypot(ix, iy) || 1;
-                                state.player.vx = (ix / len) * state.speed;
-                                state.player.vy = (iy / len) * state.speed;
-                            } else { state.player.vx = 0; state.player.vy = 0; }
+                        // 시간 제한 처리
+                        if (!state.levelCleared && !state.timeUp) {
+                            const elapsed = (Date.now() - state.startTime) / 1000;
+                            if (elapsed >= state.timeLimitSeconds) {
+                                state.timeUp = true;
+                                MazeGame.ui.showGameOverOverlay();
+                                return;
+                            }
                         }
 
-                        // 이동 및 충돌
-                        let nextX = state.player.x + state.player.vx * dt;
-                        let nextY = state.player.y + state.player.vy * dt;
-                        if (this.canMoveToPos(nextX, state.player.y)) { state.player.x = nextX; } else { state.player.vx = 0; }
-                        if (this.canMoveToPos(state.player.x, nextY)) { state.player.y = nextY; } else { state.player.vy = 0; }
+                        // 플레이어 이동
+                        // ✅ MazeGame.engine.update 내부 교체
+                        const { player, speed } = state;
 
-                        // 게임 상태 업데이트
-                        this.checkTimeout();
-                        this.revealAround(state.player.x, state.player.y);
-                        this.tryCollectItems();
-                        this.checkGoal();
+                        // 이동 후보 좌표 계산
+                        let nextX = player.x + player.vx * dt;
+                        let nextY = player.y + player.vy * dt;
 
-                        // 렌더링
-                        this.draw(now);
-                        this.drawMiniMap();
+                        // 충돌 검사 (벽 통과 방지)
+                        if (MazeGame.engine.canMoveToPos(nextX, player.y)) {
+                            player.x = nextX;
+                        } else {
+                            player.vx = 0;
+                        }
 
-                        requestAnimationFrame(this.update.bind(this));
-                    } catch (err) {
-                        console.error('게임 루프 에러:', err);
-                        MazeGame.state.lastTime = performance.now();
-                        requestAnimationFrame(this.update.bind(this));
+                        if (MazeGame.engine.canMoveToPos(player.x, nextY)) {
+                            player.y = nextY;
+                        } else {
+                            player.vy = 0;
+                        }
+                        // const { player, speed } = state;
+                        // player.x += player.vx * dt;
+                        // player.y += player.vy * dt;
+
+                        // 방향 전환 (vx, vy 기준)
+                        if (Math.abs(player.vx) > 0.1 || Math.abs(player.vy) > 0.1) {
+                            if (Math.abs(player.vx) > Math.abs(player.vy)) {
+                                state.playerDirection = player.vx > 0 ? "right" : "left";
+                            } else {
+                                state.playerDirection = player.vy > 0 ? "down" : "up";
+                            }
+                        }
+
+                        // 충돌 및 게임 로직
+                        MazeGame.engine.checkGoal();
+                        MazeGame.engine.tryCollectItems();
+                        MazeGame.engine.drawMiniMap();
+                        MazeGame.engine.draw();
+
+                        // 다음 프레임
+                        requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
+                    } catch (e) {
+                        console.warn('update error', e);
                     }
                 },
+                // update(now) {
+                //     try {
+                //         const { state, utils } = MazeGame;
+
+                //         // ✅ 게임 중단 상태라면 루프 종료
+                //         if (!state.isRunning) return;
+
+                //         const dt = Math.min(0.05, (now - state.lastTime) / 1000);
+                //         state.lastTime = now;
+
+                //         // 입력 처리
+                //         if (!state.joyActive) {
+                //             let ix = 0, iy = 0;
+                //             if (state.keys['arrowup'] || state.keys['w']) iy -= 1;
+                //             if (state.keys['arrowdown'] || state.keys['s']) iy += 1;
+                //             if (state.keys['arrowleft'] || state.keys['a']) ix -= 1;
+                //             if (state.keys['arrowright'] || state.keys['d']) ix += 1;
+                //             if (ix !== 0 || iy !== 0) {
+                //                 const len = Math.hypot(ix, iy) || 1;
+                //                 state.player.vx = (ix / len) * state.speed;
+                //                 state.player.vy = (iy / len) * state.speed;
+                //             } else { state.player.vx = 0; state.player.vy = 0; }
+                //         }
+
+                //         // 이동 및 충돌
+                //         let nextX = state.player.x + state.player.vx * dt;
+                //         let nextY = state.player.y + state.player.vy * dt;
+                //         if (this.canMoveToPos(nextX, state.player.y)) { state.player.x = nextX; } else { state.player.vx = 0; }
+                //         if (this.canMoveToPos(state.player.x, nextY)) { state.player.y = nextY; } else { state.player.vy = 0; }
+
+                //         // 게임 상태 업데이트
+                //         this.checkTimeout();
+                //         this.revealAround(state.player.x, state.player.y);
+                //         this.tryCollectItems();
+                //         this.checkGoal();
+
+                //         // 렌더링
+                //         this.draw(now);
+                //         this.drawMiniMap();
+
+                //         requestAnimationFrame(this.update.bind(this));
+                //     } catch (err) {
+                //         console.error('게임 루프 에러:', err);
+                //         MazeGame.state.lastTime = performance.now();
+                //         requestAnimationFrame(this.update.bind(this));
+                //     }
+                // },
 
                 draw(nowTs) {
                     const { ctx, gameCanvas } = MazeGame.dom;
@@ -862,9 +932,26 @@
                         if (img) ctx.drawImage(img, px, py, size, size);
                     }
 
+                    // ✅ 플레이어 렌더링
+                    const { playerImages, playerDirection } = MazeGame.state;
                     const psize = tileSize * player.size;
-                    ctx.fillStyle = "red";
-                    ctx.fillRect(gameCanvas.width / 2 - psize / 2, gameCanvas.height / 2 - psize / 2, psize, psize);
+                    const img = playerImages[playerDirection];
+
+                    // 플레이어를 화면 중앙에 그립니다 (카메라 따라 이동)
+                    const drawX = gameCanvas.width / 2 - psize / 2;
+                    const drawY = gameCanvas.height / 2 - psize / 2;
+
+                    if (img && img.complete) {
+                        ctx.drawImage(img, drawX, drawY, psize, psize);
+                    } else {
+                        // fallback: 기존 빨간 네모
+                        ctx.fillStyle = "red";
+                        ctx.fillRect(drawX, drawY, psize, psize);
+                    }
+
+                    // const psize = tileSize * player.size;
+                    // ctx.fillStyle = "red";
+                    // ctx.fillRect(gameCanvas.width / 2 - psize / 2, gameCanvas.height / 2 - psize / 2, psize, psize);
 
                     const rem = this.getRemainingSeconds();
                     this.drawTimer(rem);
@@ -1353,6 +1440,11 @@
                     this.state.itemImages["key"].src = "img/item/Bread.png";
                     ["1x1", "1x2", "1x3", "2x1", "3x1"].forEach(key => this.state.blockImages[key] = new Image());
 
+                    this.state.playerImages.up.src = "img/player/player_up.png";
+                    this.state.playerImages.down.src = "img/player/player_down.png";
+                    this.state.playerImages.left.src = "img/player/player_left.png";
+                    this.state.playerImages.right.src = "img/player/player_right.png";
+
                     // 이벤트 리스너 바인딩
                     document.getElementById('resetSpawn').addEventListener('click', () => {
                         this.storage.resetSpawnSession();
@@ -1369,6 +1461,40 @@
                         this.ui.showToast('도감이 초기화되었습니다.');
                         this.engine.showIntroStart();
                     });
+                    // ✅ 키보드 입력 추가
+                    document.addEventListener('keydown', e => {
+                        const p = MazeGame.state.player;
+                        const s = MazeGame.state.speed / 2; // 이동 속도 (조이스틱보다 살짝 느리게)
+                        switch (e.key) {
+                            case 'ArrowUp':
+                            case 'w':
+                                p.vy = -s;
+                                MazeGame.state.playerDirection = "up";
+                                break;
+                            case 'ArrowDown':
+                            case 's':
+                                p.vy = s;
+                                MazeGame.state.playerDirection = "down";
+                                break;
+                            case 'ArrowLeft':
+                            case 'a':
+                                p.vx = -s;
+                                MazeGame.state.playerDirection = "left";
+                                break;
+                            case 'ArrowRight':
+                            case 'd':
+                                p.vx = s;
+                                MazeGame.state.playerDirection = "right";
+                                break;
+                        }
+                    });
+
+                    document.addEventListener('keyup', e => {
+                        const p = MazeGame.state.player;
+                        if (['ArrowUp', 'ArrowDown', 'w', 's'].includes(e.key)) p.vy = 0;
+                        if (['ArrowLeft', 'ArrowRight', 'a', 'd'].includes(e.key)) p.vx = 0;
+                    });
+
 
                     // 초기 데이터 로드 및 설정
                     this.storage.loadStories();
