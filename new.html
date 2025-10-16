@@ -689,12 +689,22 @@
                     const r = MazeGame.dom.joystick.getBoundingClientRect();
                     MazeGame.state.joyCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
                 },
-                setStickPos(dx, dy) {
-                    const max = (MazeGame.dom.joystick.clientWidth / 2 - MazeGame.dom.stick.clientWidth / 2 - 6);
-                    const tx = Math.max(-1, Math.min(1, dx)) * max;
-                    const ty = Math.max(-1, Math.min(1, dy)) * max;
-                    MazeGame.dom.stick.style.transform = `translate(${tx}px, ${ty}px)`;
+                setStickPos(nx, ny) {
+                    const joy = MazeGame.dom.joystick;
+                    const stick = MazeGame.dom.stick;
+                    const max = (joy.clientWidth - stick.clientWidth) / 2;
+
+                    const dx = nx * max;
+                    const dy = ny * max;
+
+                    stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
                 },
+                // setStickPos(dx, dy) {
+                //     const max = (MazeGame.dom.joystick.clientWidth / 2 - MazeGame.dom.stick.clientWidth / 2 - 6);
+                //     const tx = Math.max(-1, Math.min(1, dx)) * max;
+                //     const ty = Math.max(-1, Math.min(1, dy)) * max;
+                //     MazeGame.dom.stick.style.transform = `translate(${tx}px, ${ty}px)`;
+                // },
                 startJoy(x, y) {
                     MazeGame.state.joyActive = true;
                     this.initJoyCenter();
