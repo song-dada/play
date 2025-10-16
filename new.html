@@ -1298,85 +1298,163 @@
              * - 게임 시작에 필요한 모든 요소를 설정하고 실행합니다.
              */
             init() {
-                // DOM 요소 캐싱
-                this.dom = {
-                    gameCanvas: document.getElementById('game'),
-                    ctx: document.getElementById('game').getContext('2d'),
-                    miniCanvas: document.getElementById('miniMap'),
-                    miniCtx: document.getElementById('miniMap').getContext('2d'),
-                    overlay: document.getElementById('overlay'),
-                    overlayPanel: document.getElementById('overlayPanel'),
-                    codexOverlay: document.getElementById('codexOverlay'),
-                    codexPanel: document.getElementById('codexPanel'),
-                    codexBtn: document.getElementById('codexBtn'),
-                    homeBtn: document.getElementById('homeBtn'),
-                    freshStartBtn: document.getElementById('freshStartBtn'),
-                    levelText: document.getElementById('levelText'),
-                    itemKeyEl: document.getElementById('itemKeyEl'),
-                    itemCompassEl: document.getElementById('itemCompassEl'),
-                    joystick: document.getElementById('joystick'),
-                    stick: document.getElementById('stick')
-                };
+                // ✅ 초기화 시 약간의 지연을 주어 모바일 초기 로딩 안정화
+                setTimeout(() => {
 
-                // 이미지 객체 초기화
-                this.state.itemImages["note"].src = "img/item/Letter.png";
-                this.state.itemImages["key"].src = "img/item/Bread.png";
-                ["1x1", "1x2", "1x3", "2x1", "3x1"].forEach(key => this.state.blockImages[key] = new Image());
+                    // DOM 요소 캐싱
+                    this.dom = {
+                        gameCanvas: document.getElementById('game'),
+                        ctx: document.getElementById('game').getContext('2d'),
+                        miniCanvas: document.getElementById('miniMap'),
+                        miniCtx: document.getElementById('miniMap').getContext('2d'),
+                        overlay: document.getElementById('overlay'),
+                        overlayPanel: document.getElementById('overlayPanel'),
+                        codexOverlay: document.getElementById('codexOverlay'),
+                        codexPanel: document.getElementById('codexPanel'),
+                        codexBtn: document.getElementById('codexBtn'),
+                        homeBtn: document.getElementById('homeBtn'),
+                        freshStartBtn: document.getElementById('freshStartBtn'),
+                        levelText: document.getElementById('levelText'),
+                        itemKeyEl: document.getElementById('itemKeyEl'),
+                        itemCompassEl: document.getElementById('itemCompassEl'),
+                        joystick: document.getElementById('joystick'),
+                        stick: document.getElementById('stick')
+                    };
 
-                // 이벤트 리스너 바인딩
-                document.getElementById('resetSpawn').addEventListener('click', () => {
-                    this.storage.resetSpawnSession();
-                    this.ui.showToast('세션 스폰 순서 초기화 완료.');
-                });
-                this.dom.codexBtn.addEventListener('click', () => this.codex.open());
-                this.dom.homeBtn.addEventListener('click', () => this.engine.showIntroStart());
-                this.dom.freshStartBtn.addEventListener('click', () => {
-                    if (!confirm('정말 처음부터 시작하시겠습니까? (도감/획득한 쪽지 모두 초기화됩니다)')) return;
-                    this.storage.resetCollectedStories();
-                    this.storage.resetSpawnSession();
-                    this.storage.resetLevelProgress(); // ✅ 레벨 초기화 추가
-                    this.ui.updateHud();
-                    this.ui.showToast('도감이 초기화되었습니다.');
-                    this.engine.showIntroStart();
-                });
+                    // 이미지 객체 초기화
+                    this.state.itemImages["note"].src = "img/item/Letter.png";
+                    this.state.itemImages["key"].src = "img/item/Bread.png";
+                    ["1x1", "1x2", "1x3", "2x1", "3x1"].forEach(key => this.state.blockImages[key] = new Image());
 
-                // 초기 데이터 로드 및 설정
-                this.storage.loadStories();
-                this.storage.loadLevel(); // ✅ 마지막 레벨 불러오기
-                this.input.init();
-                this.ui.updateHud();
-                this.state.lastTime = performance.now();
-
-                // 게임 시작
-                if (!this.state.collectedStories['intro']) {
-                    this.engine.showIntroStart();
-                } else {
-                    // startLevel()이 완료되기를 기다린 후, 게임 루프를 시작합니다.
-                    this.engine.startLevel(this.state.level).then(() => {
-                        requestAnimationFrame(this.engine.update.bind(this.engine));
+                    // 이벤트 리스너 바인딩
+                    document.getElementById('resetSpawn').addEventListener('click', () => {
+                        this.storage.resetSpawnSession();
+                        this.ui.showToast('세션 스폰 순서 초기화 완료.');
                     });
-                }
-                // // 게임 시작
-                // if (!this.state.collectedStories['intro']) {
-                //     this.engine.showIntroStart();
-                // } else {
-                //     this.engine.startLevel(this.state.level);
-                //     requestAnimationFrame(this.engine.update.bind(this.engine));
-                // }
+                    this.dom.codexBtn.addEventListener('click', () => this.codex.open());
+                    this.dom.homeBtn.addEventListener('click', () => this.engine.showIntroStart());
+                    this.dom.freshStartBtn.addEventListener('click', () => {
+                        if (!confirm('정말 처음부터 시작하시겠습니까? (도감/획득한 쪽지 모두 초기화됩니다)')) return;
+                        this.storage.resetCollectedStories();
+                        this.storage.resetSpawnSession();
+                        this.storage.resetLevelProgress(); // ✅ 레벨 초기화 추가
+                        this.ui.updateHud();
+                        this.ui.showToast('도감이 초기화되었습니다.');
+                        this.engine.showIntroStart();
+                    });
 
-                // 디버그용 전역 접근
-                window._GAME = {
-                    getState: () => this.state,
-                    resetStories: () => { this.storage.resetCollectedStories(); alert('stories reset'); },
-                    resetSpawnSession: () => { this.storage.resetSpawnSession(); alert('spawn session reset'); }
-                };
+                    // 초기 데이터 로드 및 설정
+                    this.storage.loadStories();
+                    this.storage.loadLevel(); // ✅ 마지막 레벨 불러오기
+                    this.input.init();
+                    this.ui.updateHud();
+                    this.state.lastTime = performance.now();
+
+                    // ✅ overlay 강제 표시 (모바일에서 초기 렌더 누락 방지)
+                    this.dom.overlay.style.display = 'flex';
+
+                    // 게임 시작
+                    if (!this.state.collectedStories['intro']) {
+                        this.engine.showIntroStart();
+                    } else {
+                        this.engine.startLevel(this.state.level).then(() => {
+                            requestAnimationFrame(this.engine.update.bind(this.engine));
+                        });
+                    }
+
+                    // 디버그용 전역 접근
+                    window._GAME = {
+                        getState: () => this.state,
+                        resetStories: () => { this.storage.resetCollectedStories(); alert('stories reset'); },
+                        resetSpawnSession: () => { this.storage.resetSpawnSession(); alert('spawn session reset'); }
+                    };
+
+                }, 200); // ✅ 약간의 지연으로 모바일 localStorage 준비 시간 확보
             }
-        };
+        }
+
+
+        //     init() {
+        //         // DOM 요소 캐싱
+        //         this.dom = {
+        //             gameCanvas: document.getElementById('game'),
+        //             ctx: document.getElementById('game').getContext('2d'),
+        //             miniCanvas: document.getElementById('miniMap'),
+        //             miniCtx: document.getElementById('miniMap').getContext('2d'),
+        //             overlay: document.getElementById('overlay'),
+        //             overlayPanel: document.getElementById('overlayPanel'),
+        //             codexOverlay: document.getElementById('codexOverlay'),
+        //             codexPanel: document.getElementById('codexPanel'),
+        //             codexBtn: document.getElementById('codexBtn'),
+        //             homeBtn: document.getElementById('homeBtn'),
+        //             freshStartBtn: document.getElementById('freshStartBtn'),
+        //             levelText: document.getElementById('levelText'),
+        //             itemKeyEl: document.getElementById('itemKeyEl'),
+        //             itemCompassEl: document.getElementById('itemCompassEl'),
+        //             joystick: document.getElementById('joystick'),
+        //             stick: document.getElementById('stick')
+        //         };
+
+        //         // 이미지 객체 초기화
+        //         this.state.itemImages["note"].src = "img/item/Letter.png";
+        //         this.state.itemImages["key"].src = "img/item/Bread.png";
+        //         ["1x1", "1x2", "1x3", "2x1", "3x1"].forEach(key => this.state.blockImages[key] = new Image());
+
+        //         // 이벤트 리스너 바인딩
+        //         document.getElementById('resetSpawn').addEventListener('click', () => {
+        //             this.storage.resetSpawnSession();
+        //             this.ui.showToast('세션 스폰 순서 초기화 완료.');
+        //         });
+        //         this.dom.codexBtn.addEventListener('click', () => this.codex.open());
+        //         this.dom.homeBtn.addEventListener('click', () => this.engine.showIntroStart());
+        //         this.dom.freshStartBtn.addEventListener('click', () => {
+        //             if (!confirm('정말 처음부터 시작하시겠습니까? (도감/획득한 쪽지 모두 초기화됩니다)')) return;
+        //             this.storage.resetCollectedStories();
+        //             this.storage.resetSpawnSession();
+        //             this.storage.resetLevelProgress(); // ✅ 레벨 초기화 추가
+        //             this.ui.updateHud();
+        //             this.ui.showToast('도감이 초기화되었습니다.');
+        //             this.engine.showIntroStart();
+        //         });
+
+        //         // 초기 데이터 로드 및 설정
+        //         this.storage.loadStories();
+        //         this.storage.loadLevel(); // ✅ 마지막 레벨 불러오기
+        //         this.input.init();
+        //         this.ui.updateHud();
+        //         this.state.lastTime = performance.now();
+
+        //         // 게임 시작
+        //         if (!this.state.collectedStories['intro']) {
+        //             this.engine.showIntroStart();
+        //         } else {
+        //             // startLevel()이 완료되기를 기다린 후, 게임 루프를 시작합니다.
+        //             this.engine.startLevel(this.state.level).then(() => {
+        //                 requestAnimationFrame(this.engine.update.bind(this.engine));
+        //             });
+        //         }
+        //         // // 게임 시작
+        //         // if (!this.state.collectedStories['intro']) {
+        //         //     this.engine.showIntroStart();
+        //         // } else {
+        //         //     this.engine.startLevel(this.state.level);
+        //         //     requestAnimationFrame(this.engine.update.bind(this.engine));
+        //         // }
+
+        //         // 디버그용 전역 접근
+        //         window._GAME = {
+        //             getState: () => this.state,
+        //             resetStories: () => { this.storage.resetCollectedStories(); alert('stories reset'); },
+        //             resetSpawnSession: () => { this.storage.resetSpawnSession(); alert('spawn session reset'); }
+        //         };
+        //     }
+        // };
 
         // DOM이 로드된 후 게임을 초기화합니다.
         window.addEventListener('DOMContentLoaded', () => {
             MazeGame.init();
         });
+
     </script>
 </body>
 
