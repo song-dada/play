@@ -797,8 +797,8 @@
                         // 충돌 및 게임 로직
                         MazeGame.engine.checkGoal();
                         MazeGame.engine.tryCollectItems();
-                        MazeGame.engine.drawMiniMap();
                         MazeGame.engine.draw();
+                        MazeGame.engine.drawMiniMap();
 
                         // 다음 프레임
                         requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
@@ -940,6 +940,14 @@
                     // 플레이어를 화면 중앙에 그립니다 (카메라 따라 이동)
                     const drawX = gameCanvas.width / 2 - psize / 2;
                     const drawY = gameCanvas.height / 2 - psize / 2;
+
+                    // ✅ 플레이어 주변을 방문한 곳으로 표시
+                    const px = Math.floor(MazeGame.state.player.x);
+                    const py = Math.floor(MazeGame.state.player.y);
+                    if (MazeGame.state.visitedMap[py] && MazeGame.state.visitedMap[py][px] !== undefined) {
+                        MazeGame.state.visitedMap[py][px] = true;
+                    }
+
 
                     if (img && img.complete) {
                         ctx.drawImage(img, drawX, drawY, psize, psize);
@@ -1248,23 +1256,28 @@
                         state.hasNoteInCurrentLevel = false;
 
                         const PATHS = {
-                            ROAD: "img/c/tiles_road/",
-                            MART: "img/c/tiles_mart/",
-                            MANSION: "img/c/tiles_mansion/",
-                            RUINS: "img/c/tiles_ruins/",
-                            OUTSIDE: "img/c/tiles_outside/"
+                            CITY_CORE: "img/tiles/city_core/",
+                            CITY_OUT: "img/tiles/city_out/",
+                            SHOP: "img/tiles/shop/",
+                            MANSION: "img/tiles/mansion/",
+                            MANSION_NAVY: "img/tiles/mansion_navy/",
+                            OUT_GREEN: "img/tiles/out_green/",
+                            OUT_FOREST: "img/tiles/out_forest/",
+                            OUT_EARTH: "img/tiles/out_earth/",
                         };
                         const TILE_SET_SEQUENCE = [
                             null,
-                            PATHS.ROAD,
-                            PATHS.MART,
-                            PATHS.ROAD,
+                            PATHS.CITY_CORE,
+                            PATHS.SHOP,
+                            PATHS.CITY_CORE,
                             PATHS.MANSION,
-                            PATHS.ROAD,
-                            PATHS.RUINS,
-                            PATHS.RUINS,
-                            PATHS.RUINS,
-                            PATHS.RUINS
+                            PATHS.MANSION_NAVY,
+                            PATHS.CITY_OUT,
+                            PATHS.OUT_GREEN,
+                            PATHS.OUT_GREEN,
+                            PATHS.OUT_FOREST,
+                            PATHS.OUT_FOREST,
+                            PATHS.OUT_EARTH
                         ];
                         const basePath = TILE_SET_SEQUENCE[lv] || PATHS.RUINS;
 
