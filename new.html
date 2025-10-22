@@ -173,16 +173,22 @@
                 SPAWN_KEY: 'maze_spawnOrder_v1',
                 SPAWN_INDEX_KEY: 'maze_spawnIndex_v1',
                 STORY_GROUPS: [
-                    { id: 'siblings', label: '남매 (마트 기록)', parts: ['siblings_1', 'siblings_2', 'siblings_3'], fullStoryId: 'siblings_full' },
-                    { id: 'maid', label: '가정부 (대저택 기록)', parts: ['maid_1', 'maid_2', 'maid_3'], fullStoryId: 'maid_full' },
-                    { id: 'traveler', label: '여행객 (길 위의 기록)', parts: ['traveler_1', 'traveler_2', 'traveler_3'], fullStoryId: 'traveler_full' },
-                    { id: 'sibling_younger', label: '남매(동생) (희망 붕괴)', parts: ['sibling_younger_1', 'sibling_younger_2', 'sibling_younger_3'], fullStoryId: 'sibling_younger_full' },
-                    { id: 'weak_union', label: '약자 연합 (여행객과 함께한 기록)', parts: ['weak_union_1', 'weak_union_2', 'weak_union_3'], fullStoryId: 'weak_union_full' }
+                    { id: 'siblings', label: '남매', parts: ['siblings_1', 'siblings_2', 'siblings_3'], fullStoryId: 'siblings_full' },
+                    { id: 'maid', label: '가정부', parts: ['maid_1', 'maid_2', 'maid_3'], fullStoryId: 'maid_full' },
+                    { id: 'traveler', label: '여행객', parts: ['traveler_1', 'traveler_2', 'traveler_3'], fullStoryId: 'traveler_full' },
+                    { id: 'sibling_younger', label: '동생', parts: ['sibling_younger_1', 'sibling_younger_2', 'sibling_younger_3'], fullStoryId: 'sibling_younger_full' },
+                    { id: 'weak_union', label: '약자 연합', parts: ['weak_union_1', 'weak_union_2', 'weak_union_3'], fullStoryId: 'weak_union_full' }
+                    // { id: 'siblings', label: '남매 (마트 기록)', parts: ['siblings_1', 'siblings_2', 'siblings_3'], fullStoryId: 'siblings_full' },
+                    // { id: 'maid', label: '가정부 (대저택 기록)', parts: ['maid_1', 'maid_2', 'maid_3'], fullStoryId: 'maid_full' },
+                    // { id: 'traveler', label: '여행객 (길 위의 기록)', parts: ['traveler_1', 'traveler_2', 'traveler_3'], fullStoryId: 'traveler_full' },
+                    // { id: 'sibling_younger', label: '남매(동생) (희망 붕괴)', parts: ['sibling_younger_1', 'sibling_younger_2', 'sibling_younger_3'], fullStoryId: 'sibling_younger_full' },
+                    // { id: 'weak_union', label: '약자 연합 (여행객과 함께한 기록)', parts: ['weak_union_1', 'weak_union_2', 'weak_union_3'], fullStoryId: 'weak_union_full' }
                 ],
                 STORY_TEXTS: {
-                    intro: ['깊은 미궁 속으로 발을 내딛었다. 어둠 속에서 무언가 속삭이는 듯하다...'],
-                    key: ['낡은 열쇠를 손에 넣었다. 녹슨 금속이 차갑게 닿는다.'],
-                    compass: [['서쪽에서 기묘한 기운이 느껴진다...', '나침반이 갑자기 흔들리며 방향을 잃는다...'], ['멀리서 낮은 울음소리가 들려온다...', '벽에 새겨진 고대 문양이 눈에 들어왔다...'], ['‘출구는 없다’는 목소리가 메아리쳤다...', '차갑고 습한 공기가 더 짙어졌다...']],
+                    intro: ['세상이 혼란에 빠지고 15일, 바닥을 보인 식량에 나는 물자를 구하기 위해 밖으로 나섰다...'],
+                    // intro: ['깊은 미궁 속으로 발을 내딛었다. 어둠 속에서 무언가 속삭이는 듯하다...'],
+                    // key: ['낡은 열쇠를 손에 넣었다. 녹슨 금속이 차갑게 닿는다.'],
+                    // compass: [['서쪽에서 기묘한 기운이 느껴진다...', '나침반이 갑자기 흔들리며 방향을 잃는다...'], ['멀리서 낮은 울음소리가 들려온다...', '벽에 새겨진 고대 문양이 눈에 들어왔다...'], ['‘출구는 없다’는 목소리가 메아리쳤다...', '차갑고 습한 공기가 더 짙어졌다...']],
                     level1: ['첫 번째 미궁을 통과했다!'],
                     level2: ['더 깊은 곳으로 발걸음을 옮긴다...'],
                     ending: ['드디어 미궁에서 탈출했다!'],
@@ -196,7 +202,7 @@
                     traveler_2: ["길은 막혔고, 위험은 많았다.\n하지만 혼자였다면 벌써 포기했을 것이다."],
                     traveler_3: ["내일은 더 나아지리라 믿는다.\n우리가 도착할 곳은 여기 아니니까."],
                     sibling_younger_1: ["누나가 기침을 시작했다.\n멀쩡했던 사람이, 갑자기."],
-                    sibling_younger_2: ["열은 오르고, 기침은 거칠어졌다.\n내 약을 건븄지만… 고갤 저었다."],
+                    sibling_younger_2: ["열은 오르고, 기침은 거칠어졌다.\n내 약을 건냈냈지만… 고갤 저었다."],
                     sibling_younger_3: ["누나는 쓰러졌다.\n나는 살아서 캠프로 갈게.\n잘 자, 누나."],
                     weak_union_1: ["우린 약자였다.\n그래서 모였다. 서로를 지키기 위해."],
                     weak_union_2: ["뒤따르던 그를 받아들였다.\n낯설었지만, 적은 아니었다."],
@@ -448,7 +454,8 @@
                         const txt = collectedStories[pid]?.text || STORY_TEXTS[pid];
                         let content = Array.isArray(txt) ? txt.join('\n\n') : String(txt || '');
                         const title = pid.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                        storyContentHtml += `<div style="font-size: 1.1em; margin-bottom: 4px; color: #9be6ff;">-- Part ${index + 1}: ${title} --</div>`;
+                        // storyContentHtml += `<div style="font-size: 1.1em; margin-bottom: 4px; color: #9be6ff;">-- Part ${index + 1} --</div>`;
+                        // storyContentHtml += `<div style="font-size: 1.1em; margin-bottom: 4px; color: #9be6ff;">-- Part ${index + 1}: ${title} --</div>`;
                         storyContentHtml += `<pre class="story">${content}</pre>`;
                     });
 
@@ -1361,8 +1368,10 @@
                 // },
 
                 showIntroStart() {
+                    const introText = MazeGame.config.STORY_TEXTS.intro[0];
                     const { overlayPanel, overlay } = MazeGame.dom;
-                    overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>깊은 미궁 속으로 발을 내딛었다. 시작 버튼을 눌러 탐험을 시작하세요.</p><div class="actions"><button class="primary" id="startBtn">게임 시작</button></div>`;
+                    overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>${introText}</p><div class="actions"><button class="primary" id="startBtn">게임 시작</button></div>`;
+                    // overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>깊은 미궁 속으로 발을 내딛었다. 시작 버튼을 눌러 탐험을 시작하세요.</p><div class="actions"><button class="primary" id="startBtn">게임 시작</button></div>`;
                     overlay.style.display = 'flex';
                     // document.getElementById('startBtn').onclick = () => {
                     //     const introText = MazeGame.config.STORY_TEXTS.intro[0];
@@ -1396,25 +1405,25 @@
                     //     }, 1200);
                     // };
                     document.getElementById('startBtn').onclick = () => {
-                        const introText = MazeGame.config.STORY_TEXTS.intro[0];
-                        overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>${introText}</p>`;
+                        // const introText = MazeGame.config.STORY_TEXTS.intro[0];
+                        // overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>${introText}</p>`;
                         MazeGame.storage.unlockNote('intro');
 
-                        setTimeout(() => {
-                            overlay.style.display = 'none';
-                            overlayPanel.innerHTML = '';
+                        // setTimeout(() => {
+                        overlay.style.display = 'none';
+                        overlayPanel.innerHTML = '';
 
-                            // ✅ 진행 중 레벨 불러오기
-                            MazeGame.storage.loadLevel();
+                        // ✅ 진행 중 레벨 불러오기
+                        MazeGame.storage.loadLevel();
 
-                            // ✅ 루프 다시 시작
-                            MazeGame.state.isRunning = true;
-                            MazeGame.state.timeUp = false;
+                        // ✅ 루프 다시 시작
+                        MazeGame.state.isRunning = true;
+                        MazeGame.state.timeUp = false;
 
-                            MazeGame.engine.startLevel(MazeGame.state.level).then(() => {
-                                requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
-                            });
-                        }, 1200);
+                        MazeGame.engine.startLevel(MazeGame.state.level).then(() => {
+                            requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
+                        });
+                        // }, 1200);
                     };
 
                 }

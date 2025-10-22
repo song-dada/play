@@ -219,7 +219,7 @@ button.ghost {
     /* 가로 정렬 */
     gap: 8px;
     align-items: center;
-    margin-top: 8px;
+    /* margin-top: 8px; */
 }
 
 .hud-actions button {
