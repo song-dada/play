@@ -86,7 +86,8 @@ canvas#game {
 
 
 /* 도감 버튼 */
-#codexBtn {
+#codexBtn,
+.secondary {
     /* font-size: 18px; */
     padding: 6px 8px;
     border-radius: 8px;
@@ -239,6 +240,25 @@ button.ghost {
 .hud-actions button.primary {
     background: #3b82f6;
 }
+
+.sound-btn {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    padding: 6px 10px;
+    font-size: 14px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    border: 1px solid #888;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.sound-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
 
 /* responsive */
 @media (max-width:520px) {

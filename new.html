@@ -6,115 +6,6 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>랜덤 미로 게임 (리팩토링 버전)</title>
     <link rel="stylesheet" href="css/new.css">
-    <!-- <style>
-        .loading-box {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .spinner {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            border: 6px solid rgba(255, 255, 255, 0.15);
-            border-top-color: #fff;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        .loading-msg {
-            font-size: 16px;
-            color: #fff;
-            text-align: center;
-            max-width: 300px;
-        }
-
-        .toast {
-            position: fixed;
-            left: 50%;
-            transform: translateX(-50%);
-            bottom: 30px;
-            background: #222;
-            color: #fff;
-            padding: 8px 12px;
-            border-radius: 6px;
-            opacity: 0.95;
-            z-index: 9999;
-        }
-
-        #codexPanel .group {
-            padding: 10px 0;
-            border-bottom: 1px dashed #333;
-            cursor: pointer;
-        }
-
-        #codexPanel .group .meta {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        #codexPanel .group .meta .title {
-            font-weight: 600;
-        }
-
-        #codexPanel .group .meta .count {
-            font-size: 12px;
-            opacity: 0.8;
-        }
-
-        pre.story {
-            white-space: pre-wrap;
-            margin: 6px 0;
-            background: #0f0f0f;
-            color: #eaeaea;
-            padding: 10px;
-            border-radius: 6px;
-        }
-
-        /* 작은 디버그 버튼 (선택) */
-        .debug-reset {
-            position: fixed;
-            right: 12px;
-            top: 12px;
-            z-index: 9999;
-            font-size: 12px;
-        }
-
-        /* 리팩토링된 버튼 스타일 */
-        .hud-actions {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            margin-top: 8px;
-            justify-content: flex-end;
-            /* 오른쪽 정렬 */
-        }
-
-        .hud-actions button {
-            padding: 6px 8px;
-            border-radius: 6px;
-            border: 0;
-            cursor: pointer;
-            background: #2a2a2a;
-            color: #fff;
-        }
-
-        .hud-actions button.primary {
-            background: #3b82f6;
-        }
-
-        #stick {
-            transition: left 0.15s ease-out, top 0.15s ease-out;
-        }
-    </style> -->
 </head>
 
 <body>
@@ -162,6 +53,11 @@
 
     <button id="resetSpawn" class="debug-reset">Reset Spawn Order (session)</button>
 
+    <button id="bgmToggle" class="sound-btn">🔊 BGM 켜짐</button>
+
+    <audio id="bgm" loop></audio>
+
+
     <script>
         const MazeGame = {
             /**
@@ -184,6 +80,17 @@
                     // { id: 'sibling_younger', label: '남매(동생) (희망 붕괴)', parts: ['sibling_younger_1', 'sibling_younger_2', 'sibling_younger_3'], fullStoryId: 'sibling_younger_full' },
                     // { id: 'weak_union', label: '약자 연합 (여행객과 함께한 기록)', parts: ['weak_union_1', 'weak_union_2', 'weak_union_3'], fullStoryId: 'weak_union_full' }
                 ],
+                // in MazeGame.config
+                BGM_PATHS: {
+                    1: 'bgm/city_core.wav',
+                    2: 'bgm/level_2_mart.mp3',
+                    3: 'bgm/city_core.wav',
+                    4: 'bgm/mansion.mp3',
+                    5: 'bgm/mansion.mp3',
+                    6: 'bgm/level_6_ruins.mp3',
+                    DEFAULT: 'bgm/default_ruins.mp3' // 6레벨 초과 시 사용할 기본 BGM
+                },
+                // ... (기존 STORY_TEXTS 등)
                 STORY_TEXTS: {
                     intro: ['세상이 혼란에 빠지고 15일, 바닥을 보인 식량에 나는 물자를 구하기 위해 밖으로 나섰다...'],
                     // intro: ['깊은 미궁 속으로 발을 내딛었다. 어둠 속에서 무언가 속삭이는 듯하다...'],
@@ -248,11 +155,13 @@
                 blockImages: {},
                 itemImages: { "note": new Image(), "key": new Image() },
                 isRunning: true,
+                audioReady: false,
 
                 // player
                 playerImages: { up: new Image(), down: new Image(), left: new Image(), right: new Image() },
                 // 기본 방향 (아무 입력 없을 때)
                 playerDirection: "down",
+                currentBGM: null, // ✅ 이 줄을 추가하세요
             },
 
             /**
@@ -314,7 +223,9 @@
                     MazeGame.dom.overlay.style.display = 'none';
                     MazeGame.dom.overlayPanel.innerHTML = '';
                 },
-                showStoryOverlay(title, text, autoCloseMs = 3000) {
+
+                // in MazeGame.ui
+                showStoryOverlay(title, text, autoCloseMs = 3000, backContextGroup = null) {
                     const { overlay, overlayPanel } = MazeGame.dom;
                     overlayPanel.innerHTML = '';
                     const h = document.createElement('h3'); h.style.margin = '0 0 6px'; h.textContent = title || '상세';
@@ -324,13 +235,39 @@
                         const p = document.createElement('pre'); p.className = 'story'; p.textContent = content;
                         overlayPanel.appendChild(p);
                     }
-                    const actions = document.createElement('div'); actions.className = 'actions';
-                    const closeBtn = document.createElement('button'); closeBtn.className = 'primary'; closeBtn.textContent = '닫기';
+                    const actions = document.createElement('div');
+                    actions.className = 'actions';
+                    Object.assign(actions.style, {
+                        display: 'flex',
+                        justifyContent: 'space-between', // 양쪽 정렬
+                        marginTop: '12px',
+                    });
+
+                    // ▼ "이전으로" 버튼 로직 (backContextGroup이 있을 때만 생성) ▼
+                    if (backContextGroup) {
+                        const backBtn = document.createElement('button');
+                        backBtn.className = 'secondary'; // "이전" 버튼
+                        backBtn.textContent = '이전으로';
+                        backBtn.onclick = () => {
+                            overlay.style.display = 'none'; // 현재 오버레이 닫기
+                            // 이전에 봤던 그룹 오버레이(쪽지 모음창)를 다시 엽니다.
+                            MazeGame.codex.showGroupOverlay(backContextGroup);
+                        };
+                        actions.appendChild(backBtn); // 왼쪽에 "이전으로"
+                    } else {
+                        // "이전" 버튼이 없을 경우 공간을 차지할 빈 div를 추가하여 "닫기" 버튼을 오른쪽 정렬
+                        actions.appendChild(document.createElement('div'));
+                    }
+
+                    const closeBtn = document.createElement('button');
+                    closeBtn.className = 'ghost'; // "닫기" 버튼
+                    closeBtn.textContent = '닫기';
                     closeBtn.onclick = () => { overlay.style.display = 'none'; };
-                    actions.appendChild(closeBtn);
+                    actions.appendChild(closeBtn); // 오른쪽에 "닫기"
                     overlayPanel.appendChild(actions);
+
                     overlay.style.display = 'flex';
-                    if (autoCloseMs > 0) {
+                    if (autoCloseMs > 0 && !backContextGroup) { // "이전" 버튼이 없으면 자동 닫기 활성화
                         setTimeout(() => { if (overlay.style.display === 'flex') overlay.style.display = 'none'; }, autoCloseMs);
                     }
                 },
@@ -355,37 +292,10 @@
                         // .bind(MazeGame.engine)을 추가하여 'this'를 명시적으로 바인딩합니다.
                         requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
                     };
-                    // restartBtn.onclick = () => {
-                    //     overlay.style.display = 'none';
-                    //     MazeGame.state.timeUp = false;
-                    //     MazeGame.engine.startLevel(MazeGame.state.level);
-                    //     // 여기서 .bind()가 빠져서 'this' 컨텍스트가 유실됩니다.
-                    //     requestAnimationFrame(MazeGame.engine.update);
-                    // };
+
                     actions.appendChild(restartBtn);
                     const exitBtn = document.createElement('button'); exitBtn.className = 'ghost'; exitBtn.style.marginLeft = '8px'; exitBtn.textContent = '종료';
-                    // exitBtn.onclick = () => {
-                    //     overlay.style.display = 'none';
-                    //     MazeGame.state.timeUp = false;
 
-                    //     // ✅ 전체 상태 리셋
-                    //     MazeGame.state = {
-                    //         ...MazeGame.state,
-                    //         maze: [],
-                    //         revealMap: [],
-                    //         visitedMap: [],
-                    //         items: [],
-                    //         hasKey: false,
-                    //         hasNoteInCurrentLevel: false,
-                    //         levelCleared: false,
-                    //         joyActive: false,
-                    //         timeUp: false,
-                    //         player: { x: 1.5, y: 1.5, size: 0.65, vx: 0, vy: 0 },
-                    //     };
-
-                    //     MazeGame.ui.updateHud();
-                    //     MazeGame.engine.showIntroStart();
-                    // };
                     exitBtn.onclick = () => {
                         overlay.style.display = 'none';
                         MazeGame.state.timeUp = false;
@@ -409,17 +319,63 @@
                         // ✅ 홈화면 표시
                         MazeGame.engine.showIntroStart();
                     };
-                    // exitBtn.onclick = () => {
-                    //     overlay.style.display = 'none';
-                    //     MazeGame.state.timeUp = false;
-                    //     MazeGame.engine.showIntroStart();
-                    // };
+
                     actions.appendChild(exitBtn);
                     panel.appendChild(actions);
                     overlayPanel.appendChild(panel);
                     overlay.style.display = 'flex';
                 }
             },
+
+            // MazeGame 객체 내부에 audio 모듈 추가
+            audio: {
+                playBGM(level) {
+                    const bgm = document.getElementById('bgm');
+                    if (!bgm) return;
+
+                    let src = '';
+                    if (level >= 1 && level <= 3) src = 'audio/bgm_SCP-x7x.mp3';
+                    else if (level >= 4 && level <= 5) src = 'audio/bgm_Despair_and_Triumph.mp3';
+                    else if (level >= 6 && level <= 12) src = 'audio/bgm_SCP-x5x.mp3';
+                    else if (level >= 13 && level <= 15) src = 'audio/bgm_SCP-x6x.mp3';
+                    else src = 'audio/bgm_Ossuary_6_Air.mp3';
+
+                    // 🔹 유저 허용 없으면 재생 예약만
+                    if (!MazeGame.state.audioReady) {
+                        console.warn('🎧 아직 오디오 허용 안 됨 — 다음 클릭 시 재시도 예정');
+                        const tryPlay = () => {
+                            MazeGame.state.audioReady = true;
+                            MazeGame.audio.playBGM(level);
+                            document.removeEventListener('click', tryPlay);
+                            document.removeEventListener('touchstart', tryPlay);
+                        };
+                        document.addEventListener('click', tryPlay);
+                        document.addEventListener('touchstart', tryPlay);
+                        return;
+                    }
+
+                    bgm.pause();
+                    bgm.src = src;
+                    bgm.volume = 0.4;
+                    bgm.load();
+                    bgm.play().catch(e => console.warn('BGM 재생 실패:', e));
+                },
+
+
+                stopBGM() {
+                    const bgm = document.getElementById('bgm');
+                    if (bgm) bgm.pause();
+                },
+
+                toggle() {
+                    const bgm = document.getElementById('bgm');
+                    const btn = document.getElementById('bgmToggle');
+                    this.muted = !this.muted;
+                    if (bgm) bgm.volume = this.muted ? 0 : 0.4;
+                    if (btn) btn.textContent = this.muted ? '🔇 BGM 꺼짐' : '🔊 BGM 켜짐';
+                },
+            },
+            // ... (기존 storage, input 등)
 
             /**
              * 6. 도감 (Codex) 관리
@@ -450,22 +406,25 @@
                     } else {
                         storyContentHtml += '<div style="margin-bottom: 10px; opacity: 0.8;">(일부 획득)</div>';
                     }
-                    displayParts.forEach((pid, index) => {
+
+                    displayParts.forEach((pid) => {
                         const txt = collectedStories[pid]?.text || STORY_TEXTS[pid];
                         let content = Array.isArray(txt) ? txt.join('\n\n') : String(txt || '');
-                        const title = pid.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                        // storyContentHtml += `<div style="font-size: 1.1em; margin-bottom: 4px; color: #9be6ff;">-- Part ${index + 1} --</div>`;
-                        // storyContentHtml += `<div style="font-size: 1.1em; margin-bottom: 4px; color: #9be6ff;">-- Part ${index + 1}: ${title} --</div>`;
                         storyContentHtml += `<pre class="story">${content}</pre>`;
                     });
 
+                    // ✅ 패널 초기화 및 내용 삽입
                     overlayPanel.innerHTML = '';
-                    const h = document.createElement('h3'); h.style.margin = '0 0 8px'; h.textContent = group.label;
+                    const h = document.createElement('h3');
+                    h.style.margin = '0 0 8px';
+                    h.textContent = group.label;
                     overlayPanel.appendChild(h);
+
                     const noteContainer = document.createElement('div');
                     noteContainer.innerHTML = storyContentHtml;
                     overlayPanel.appendChild(noteContainer);
 
+                    // ✅ 전체 스토리 버튼
                     if (gotAll && fullStoryText) {
                         const fullStoryBtn = document.createElement('button');
                         fullStoryBtn.className = 'primary';
@@ -473,21 +432,48 @@
                         Object.assign(fullStoryBtn.style, { marginTop: '15px', marginBottom: '8px', width: '100%' });
                         fullStoryBtn.onclick = () => {
                             overlay.style.display = 'none';
-                            MazeGame.ui.showStoryOverlay(`[${group.label}] - 전체 스토리`, fullStoryText, 0);
+                            MazeGame.ui.showStoryOverlay(`[${group.label}] - 전체 스토리`, fullStoryText, 0, group);
+
+                            // MazeGame.ui.showStoryOverlay(`[${group.label}] - 전체 스토리`, fullStoryText, 0);
                         };
                         overlayPanel.appendChild(fullStoryBtn);
                     }
 
                     const hint = document.createElement('p');
                     Object.assign(hint.style, { opacity: '0.9', marginTop: '8px' });
-                    hint.textContent = gotAll ? `모든 쪽지를 모았습니다. 완성된 스토리가 해금되었습니다.` : `모은 쪽지: ${collectedCount}/${total}. 모든 쪽지를 모아야 완성된 스토리를 볼 수 있습니다.`;
+                    hint.textContent = gotAll
+                        ? `모든 쪽지를 모았습니다. 완성된 스토리가 해금되었습니다.`
+                        : `모은 쪽지: ${collectedCount}/${total}. 모든 쪽지를 모아야 완성된 스토리를 볼 수 있습니다.`;
                     overlayPanel.appendChild(hint);
 
-                    const actions = document.createElement('div'); actions.className = 'actions';
-                    const closeBtn = document.createElement('button'); closeBtn.className = 'ghost'; closeBtn.textContent = '닫기';
-                    closeBtn.onclick = () => { overlay.style.display = 'none'; };
+                    // ✅ 버튼 영역 (이전으로 + 닫기)
+                    const actions = document.createElement('div');
+                    actions.className = 'actions';
+                    Object.assign(actions.style, {
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginTop: '12px',
+                    });
+
+                    const backBtn = document.createElement('button');
+                    backBtn.className = 'secondary';
+                    backBtn.textContent = '이전으로';
+                    backBtn.onclick = () => {
+                        overlay.style.display = 'none';
+                        MazeGame.codex.open(); // 🔥 도감 목록으로 복귀
+                    };
+
+                    const closeBtn = document.createElement('button');
+                    closeBtn.className = 'ghost';
+                    closeBtn.textContent = '닫기';
+                    closeBtn.onclick = () => {
+                        overlay.style.display = 'none';
+                    };
+
+                    actions.appendChild(backBtn);
                     actions.appendChild(closeBtn);
                     overlayPanel.appendChild(actions);
+
                     overlay.style.display = 'flex';
                 },
 
@@ -531,10 +517,19 @@
 
                     const close = document.createElement('div');
                     close.style.marginTop = '8px';
+                    // close.innerHTML = `
+                    //     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                    //         <button class="secondary" id="codexBack">이전으로</button>
+                    //         <button class="primary" id="codexClose">닫기</button>
+                    //     </div>`;
+
                     close.innerHTML = `<div style="text-align:right"><button class="primary" id="codexClose">닫기</button></div>`;
                     codexPanel.appendChild(close);
                     codexOverlay.style.display = 'flex';
                     document.getElementById('codexClose').onclick = () => { codexOverlay.style.display = 'none'; };
+                    // document.getElementById('codexBack').addEventListener("click", () => {
+                    //     MazeGame.codex.showList(); // 목록으로 돌아가는 함수
+                    // });
                 }
             },
 
@@ -594,20 +589,8 @@
                 loadLevel() {
                     const v = parseInt(localStorage.getItem('maze_current_level') || '1', 10);
                     MazeGame.state.level = v;
-                }
-                ,
-                // ensureSpawnOrder() {
-                //     try {
-                //         const raw = sessionStorage.getItem(MazeGame.config.SPAWN_KEY);
-                //         if (raw) {
-                //             const arr = JSON.parse(raw);
-                //             if (Array.isArray(arr) && arr.length >= 15) return arr.slice(0, 15);
-                //         }
-                //     } catch (e) { /* ignore */ }
-                //     const built = this.buildDefaultSpawnOrder();
-                //     try { sessionStorage.setItem(MazeGame.config.SPAWN_KEY, JSON.stringify(built)); } catch (e) { }
-                //     return built;
-                // },
+                },
+
                 ensureSpawnOrder() {
                     // ✅ 이제 sessionStorage 대신 localStorage 사용 (세션 유지)
                     try {
@@ -711,12 +694,6 @@
 
                     stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
                 },
-                // setStickPos(dx, dy) {
-                //     const max = (MazeGame.dom.joystick.clientWidth / 2 - MazeGame.dom.stick.clientWidth / 2 - 6);
-                //     const tx = Math.max(-1, Math.min(1, dx)) * max;
-                //     const ty = Math.max(-1, Math.min(1, dy)) * max;
-                //     MazeGame.dom.stick.style.transform = `translate(${tx}px, ${ty}px)`;
-                // },
                 startJoy(x, y) {
                     MazeGame.state.joyActive = true;
                     this.initJoyCenter();
@@ -740,7 +717,7 @@
                     MazeGame.state.player.vx = 0;
                     MazeGame.state.player.vy = 0;
                     this.setStickPos(0, 0);
-                }
+                },
             },
 
             /**
@@ -813,53 +790,6 @@
                         console.warn('update error', e);
                     }
                 },
-                // update(now) {
-                //     try {
-                //         const { state, utils } = MazeGame;
-
-                //         // ✅ 게임 중단 상태라면 루프 종료
-                //         if (!state.isRunning) return;
-
-                //         const dt = Math.min(0.05, (now - state.lastTime) / 1000);
-                //         state.lastTime = now;
-
-                //         // 입력 처리
-                //         if (!state.joyActive) {
-                //             let ix = 0, iy = 0;
-                //             if (state.keys['arrowup'] || state.keys['w']) iy -= 1;
-                //             if (state.keys['arrowdown'] || state.keys['s']) iy += 1;
-                //             if (state.keys['arrowleft'] || state.keys['a']) ix -= 1;
-                //             if (state.keys['arrowright'] || state.keys['d']) ix += 1;
-                //             if (ix !== 0 || iy !== 0) {
-                //                 const len = Math.hypot(ix, iy) || 1;
-                //                 state.player.vx = (ix / len) * state.speed;
-                //                 state.player.vy = (iy / len) * state.speed;
-                //             } else { state.player.vx = 0; state.player.vy = 0; }
-                //         }
-
-                //         // 이동 및 충돌
-                //         let nextX = state.player.x + state.player.vx * dt;
-                //         let nextY = state.player.y + state.player.vy * dt;
-                //         if (this.canMoveToPos(nextX, state.player.y)) { state.player.x = nextX; } else { state.player.vx = 0; }
-                //         if (this.canMoveToPos(state.player.x, nextY)) { state.player.y = nextY; } else { state.player.vy = 0; }
-
-                //         // 게임 상태 업데이트
-                //         this.checkTimeout();
-                //         this.revealAround(state.player.x, state.player.y);
-                //         this.tryCollectItems();
-                //         this.checkGoal();
-
-                //         // 렌더링
-                //         this.draw(now);
-                //         this.drawMiniMap();
-
-                //         requestAnimationFrame(this.update.bind(this));
-                //     } catch (err) {
-                //         console.error('게임 루프 에러:', err);
-                //         MazeGame.state.lastTime = performance.now();
-                //         requestAnimationFrame(this.update.bind(this));
-                //     }
-                // },
 
                 draw(nowTs) {
                     const { ctx, gameCanvas } = MazeGame.dom;
@@ -905,21 +835,6 @@
                                     ctx.drawImage(blockImages["1x1"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize);
                                     visited[y][x] = true;
                                 }
-                                // if (maze[y]?.[x] === 1 && !visited[y][x]) {
-                                //     let lenX = 1; while (x + lenX < cols && lenX < 3 && maze[y][x + lenX] === 1 && !visited[y][x + lenX]) lenX++;
-                                //     if (lenX > 1) {
-                                //         ctx.drawImage(blockImages[`1x${lenX}`] || blockImages["1x1"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize * lenX, tileSize);
-                                //         for (let i = 0; i < lenX; i++) visited[y][x + i] = true;
-                                //         continue;
-                                //     }
-                                //     let lenY = 1; while (y + lenY < rows && maze[y + lenY]?.[x] === 1 && !visited[y + lenY][x]) lenY++;
-                                //     if (lenY > 1 && lenY <= 3) {
-                                //         ctx.drawImage(blockImages[`${lenY}x1`] || blockImages["1x1"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize * lenY);
-                                //         for (let i = 0; i < lenY; i++) visited[y + i][x] = true;
-                                //         continue;
-                                //     }
-                                //     ctx.drawImage(blockImages["1x1"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize);
-                                //     visited[y][x] = true;
                             } else if (maze[y]?.[x] === 0) {
                                 ctx.fillStyle = "white";
                                 ctx.fillRect(x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize);
@@ -1127,6 +1042,7 @@
 
                 handleTimeUp() {
                     if (MazeGame.state.timeUp) return;
+                    MazeGame.audio.stopBGM(); // ✅ 이 줄을 추가하세요
                     MazeGame.state.timeUp = true;
                     const elapsedTotal = ((Date.now() - MazeGame.state.startTime) / 1000).toFixed(1);
                     MazeGame.ui.showGameOverOverlay({ title: '시간 초과!', message: `플레이타임: ${elapsedTotal}초\n레벨을 다시 시작하시겠습니까?` });
@@ -1212,46 +1128,6 @@
                 },
 
                 // in MazeGame.engine
-                // startLevel(lv) {
-                //     // 이 함수가 Promise를 반환하도록 수정합니다.
-                //     return new Promise(resolve => {
-                //         const { state, ui, utils } = MazeGame;
-                //         state.hasKey = false;
-                //         state.hasNoteInCurrentLevel = false;
-
-                //         const PATHS = { ROAD: "img/c/tiles_road/", MART: "img/c/tiles_mart/", MANSION: "img/c/tiles_mansion/", RUINS: "img/c/tiles_ruins/", OUTSIDE: "img/c/tiles_outside/" };
-                //         const TILE_SET_SEQUENCE = [null, PATHS.ROAD, PATHS.MART, PATHS.ROAD, PATHS.MANSION, PATHS.ROAD, PATHS.RUINS, PATHS.RUINS, PATHS.RUINS, PATHS.RUINS];
-                //         const basePath = TILE_SET_SEQUENCE[lv] || PATHS.RUINS;
-
-                //         const loadPromises = Object.keys(state.blockImages).map(key => {
-                //             return new Promise(res => {
-                //                 state.blockImages[key].onload = res;
-                //                 state.blockImages[key].src = `${basePath}block_${key}.png`;
-                //             });
-                //         });
-
-                //         Promise.all(loadPromises).then(() => {
-                //             state.level = lv;
-                //             state.cols = 21 + (lv - 1) * 2;
-                //             state.rows = 21 + (lv - 1) * 2;
-                //             if (state.cols % 2 === 0) state.cols++;
-                //             if (state.rows % 2 === 0) state.rows++;
-
-                //             state.timeLimitSeconds = utils.getTimeLimitForLevel(lv);
-                //             state.startTime = Date.now(); // startTime이 여기서 설정되고
-                //             state.timeUp = false;
-
-                //             this.generateMaze(state.cols, state.rows);
-                //             Object.assign(state.player, { x: 1.5, y: 1.5, vx: 0, vy: 0 });
-                //             state.levelCleared = false;
-                //             this.placeItemsForLevel();
-                //             this.revealAround(state.player.x, state.player.y);
-                //             ui.updateHud();
-
-                //             resolve(); // 모든 준비가 끝났다고 알려줍니다.
-                //         });
-                //     });
-                // },
                 startLevel(lv) {
                     return new Promise(resolve => {
                         // ✅ 혹시 남아있을 수 있는 오버레이 닫기
@@ -1310,6 +1186,7 @@
                         // 모든 이미지 로드 완료 후 실행
                         Promise.all(loadPromises).then(() => {
                             state.level = lv;
+                            MazeGame.audio.playBGM(lv); // ✅ 이 줄을 추가하세요
                             state.cols = 21 + (lv - 1) * 2;
                             state.rows = 21 + (lv - 1) * 2;
                             if (state.cols % 2 === 0) state.cols++;
@@ -1327,87 +1204,59 @@
                             ui.updateHud();
 
                             resolve();
+
+                            MazeGame.audio.playBGM(lv); // ✅ 이 줄을 추가하세요
                         });
+
                     });
                 },
 
-                // startLevel(lv) {
-                //     const { state, ui, utils } = MazeGame;
-                //     state.hasKey = false;
-                //     state.hasNoteInCurrentLevel = false;
 
-                //     const PATHS = { ROAD: "img/c/tiles_road/", MART: "img/c/tiles_mart/", MANSION: "img/c/tiles_mansion/", RUINS: "img/c/tiles_ruins/", OUTSIDE: "img/c/tiles_outside/" };
-                //     const TILE_SET_SEQUENCE = [null, PATHS.ROAD, PATHS.MART, PATHS.ROAD, PATHS.MANSION, PATHS.ROAD, PATHS.RUINS, PATHS.RUINS, PATHS.RUINS, PATHS.RUINS];
-                //     const basePath = TILE_SET_SEQUENCE[lv] || PATHS.RUINS;
+                playBgmForLevel(level) {
+                    const bgm = document.getElementById('bgm');
+                    if (!bgm) return;
 
-                //     const loadPromises = Object.keys(state.blockImages).map(key => {
-                //         return new Promise(resolve => {
-                //             state.blockImages[key].onload = resolve;
-                //             state.blockImages[key].src = `${basePath}block_${key}.png`;
-                //         });
-                //     });
+                    let src = '';
+                    if (level >= 1 && level <= 3) src = 'audio/bgm_center.mp3';
+                    else if (level >= 4 && level <= 5) src = 'audio/bgm_mansion.mp3';
+                    else if (level >= 6 && level <= 12) src = 'audio/bgm_outer.mp3';
+                    else if (level >= 13 && level <= 15) src = 'audio/bgm_field.mp3';
 
-                //     Promise.all(loadPromises).then(() => {
-                //         state.level = lv;
-                //         state.cols = 21 + (lv - 1) * 2;
-                //         state.rows = 21 + (lv - 1) * 2;
-                //         if (state.cols % 2 === 0) state.cols++;
-                //         if (state.rows % 2 === 0) state.rows++;
+                    if (bgm.src.endsWith(src)) return; // 이미 같은 곡이면 교체 안 함
 
-                //         state.timeLimitSeconds = utils.getTimeLimitForLevel(lv);
-                //         state.startTime = Date.now();
-                //         state.timeUp = false;
+                    bgm.pause();
+                    bgm.src = src;
+                    bgm.volume = 0.4;
+                    bgm.load();
+                    bgm.play().catch(e => console.warn('BGM 재생 실패', e));
+                },
 
-                //         this.generateMaze(state.cols, state.rows);
-                //         Object.assign(state.player, { x: 1.5, y: 1.5, vx: 0, vy: 0 });
-                //         state.levelCleared = false;
-                //         this.placeItemsForLevel();
-                //         this.revealAround(state.player.x, state.player.y);
-                //         ui.updateHud();
-                //     });
-                // },
 
                 showIntroStart() {
+                    MazeGame.audio.stopBGM(); // ✅ 이 줄을 추가하세요
                     const introText = MazeGame.config.STORY_TEXTS.intro[0];
                     const { overlayPanel, overlay } = MazeGame.dom;
                     overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>${introText}</p><div class="actions"><button class="primary" id="startBtn">게임 시작</button></div>`;
                     // overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>깊은 미궁 속으로 발을 내딛었다. 시작 버튼을 눌러 탐험을 시작하세요.</p><div class="actions"><button class="primary" id="startBtn">게임 시작</button></div>`;
                     overlay.style.display = 'flex';
-                    // document.getElementById('startBtn').onclick = () => {
-                    //     const introText = MazeGame.config.STORY_TEXTS.intro[0];
-                    //     overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>${introText}</p>`;
-                    //     MazeGame.storage.unlockNote('intro');
-                    //     setTimeout(() => {
-                    //         overlay.style.display = 'none';
-                    //         MazeGame.state.isRunning = true; // ✅ 루프 다시 켜기
-                    //         this.startLevel(1);
-                    //         requestAnimationFrame(this.update.bind(this));
-                    //     }, 1200);
-                    // };
-                    // document.getElementById('startBtn').onclick = () => {
-                    //     const introText = MazeGame.config.STORY_TEXTS.intro[0];
-                    //     overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>${introText}</p>`;
-                    //     MazeGame.storage.unlockNote('intro');
 
-                    //     setTimeout(() => {
-                    //         // ✅ 오버레이 완전 닫기
-                    //         overlay.style.display = 'none';
-                    //         overlayPanel.innerHTML = '';
-
-                    //         // ✅ 루프 재시작 준비
-                    //         MazeGame.state.isRunning = true;
-                    //         MazeGame.state.timeUp = false;
-
-                    //         MazeGame.engine.startLevel(1).then(() => {
-                    //             // ✅ 안전하게 루프 시작
-                    //             requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
-                    //         });
-                    //     }, 1200);
-                    // };
                     document.getElementById('startBtn').onclick = () => {
                         // const introText = MazeGame.config.STORY_TEXTS.intro[0];
                         // overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>${introText}</p>`;
                         MazeGame.storage.unlockNote('intro');
+
+                        // ✅ BGM 재생 허용 (사용자 클릭 시 1회 실행)
+                        const bgm = document.getElementById('bgm');
+                        if (bgm && bgm.paused) {
+                            bgm.volume = 0; // 무음으로 재생
+                            bgm.play().then(() => {
+                                bgm.pause(); // 일단 정지 (이 시점에서 autoplay 허용됨)
+                                bgm.currentTime = 0;
+                                bgm.volume = 0.4; // 실제 재생 시 볼륨 복원
+                                localStorage.setItem('audioUnlocked', 'true'); // ✅ 다음부터는 자동 실행 가능
+                                // MazeGame.state.audioReady = true; // ✅ 이제 허용됨
+                            }).catch(err => console.warn('🔇 초기 BGM 허용 실패:', err));
+                        }
 
                         // setTimeout(() => {
                         overlay.style.display = 'none';
@@ -1528,14 +1377,136 @@
                     // ✅ overlay 강제 표시 (모바일에서 초기 렌더 누락 방지)
                     this.dom.overlay.style.display = 'flex';
 
+
+                    // ✅ 오디오 허용 상태 확인 및 처리
+                    const hasAudioUnlock = localStorage.getItem('audioUnlocked') === 'true';
+                    const bgm = document.getElementById('bgm');
+
+                    if (!hasAudioUnlock) {
+                        // 🔸 처음 접속 → 오디오 허용 안 됨 → 시작 버튼 강제로 띄움
+                        this.engine.showIntroStart();
+
+                        // 🔹 버튼 생성 완료 후 리스너 등록 (DOM 반영 타이밍 보장)
+                        const tryBindAudio = () => {
+                            const startBtn = document.getElementById('startBtn');
+                            if (startBtn) {
+                                startBtn.addEventListener('click', () => {
+                                    if (bgm && bgm.paused) {
+                                        bgm.volume = 0.4;
+                                        bgm.play()
+                                            .then(() => {
+                                                console.log('🎵 오디오 권한 획득');
+                                                localStorage.setItem('audioUnlocked', 'true');
+                                            })
+                                            .catch(err => console.warn('BGM 허용 실패', err));
+                                    }
+                                }, { once: true });
+                            } else {
+                                // 버튼이 아직 없으면 약간 늦게 다시 시도
+                                setTimeout(tryBindAudio, 100);
+                            }
+                        };
+                        tryBindAudio();
+                    } else {
+                        // 🔸 이미 오디오 허용됨 → 무음으로 미리 활성화
+                        if (bgm && bgm.paused) {
+                            bgm.volume = 0;
+                            bgm.play().then(() => {
+                                bgm.pause();
+                                bgm.currentTime = 0;
+                                bgm.volume = 0.4;
+                                console.log('🎶 오디오 자동활성화');
+                            }).catch(err => console.warn('BGM 자동활성화 실패', err));
+                        }
+                    }
+
+
                     // 게임 시작
+                    // const hasAudioUnlock = localStorage.getItem('audioUnlocked') === 'true';
+
                     if (!this.state.collectedStories['intro']) {
+                        // 📘 처음 접속한 유저 — intro 스토리 없으면 인트로부터 시작
+                        // 이 경우 showIntroStart() 내부에 '시작하기' 버튼이 오디오 권한을 획득하게 됩니다.
                         this.engine.showIntroStart();
                     } else {
-                        this.engine.startLevel(this.state.level).then(() => {
-                            requestAnimationFrame(this.engine.update.bind(this.engine));
-                        });
+                        // 📗 이미 접속했던 유저 (intro 스토리 획득함)
+                        if (hasAudioUnlock) {
+                            // ✅ 오디오 권한이 이미 있다면 자동으로 이어서 시작
+                            this.engine.startLevel(this.state.level).then(() => {
+                                requestAnimationFrame(this.engine.update.bind(this.engine));
+                            });
+                        } else {
+                            // 🔸 오디오 권한이 없으면, 권한 획득을 위한 오버레이를 띄웁니다.
+                            // showIntroStart() 함수를 재사용하여 '이어서 시작' 버튼을 띄우고,
+                            // 이 버튼이 클릭될 때 오디오 권한을 획득하게 합니다.
+
+                            // --- 🚨 변경할 부분 시작 🚨 ---
+
+                            const { overlayPanel, overlay } = this.dom;
+                            const currentLevel = this.state.level;
+
+                            // 인트로 텍스트 대신 '이어서 시작' 메시지 사용
+                            overlayPanel.innerHTML = `
+            <h3 style="margin:0 0 6px">게임 로드됨</h3>
+            <p>레벨 ${currentLevel}에서 이어서 시작합니다.</p>
+            <p>소리를 켜고 플레이하려면 '이어서 시작' 버튼을 눌러주세요.</p>
+            <div class="actions">
+                <button class="primary" id="continueBtn">이어서 시작</button>
+            </div>`;
+                            overlay.style.display = 'flex';
+
+                            document.getElementById('continueBtn').onclick = () => {
+                                overlay.style.display = 'none';
+                                overlayPanel.innerHTML = '';
+
+                                // BGM 권한 획득 시도 (showIntroStart() 내부 로직과 유사)
+                                const bgm = document.getElementById('bgm');
+                                if (bgm && bgm.paused) {
+                                    bgm.volume = 0; // 무음으로 재생
+                                    bgm.play().then(() => {
+                                        bgm.pause(); // 일단 정지 (이 시점에서 autoplay 허용됨)
+                                        bgm.currentTime = 0;
+                                        bgm.volume = 0.4; // 실제 재생 시 볼륨 복원
+                                        localStorage.setItem('audioUnlocked', 'true');
+                                        console.log('🎵 오디오 권한 획득 (이어서 시작)');
+                                    }).catch(err => console.warn('🔇 BGM 허용 실패:', err));
+                                }
+
+                                // 루프 다시 시작 및 레벨 시작
+                                this.state.isRunning = true;
+                                this.state.timeUp = false;
+
+                                this.engine.startLevel(currentLevel).then(() => {
+                                    requestAnimationFrame(this.engine.update.bind(this.engine));
+                                });
+                            }
+                            // --- 🚨 변경할 부분 끝 🚨 ---
+                        }
                     }
+
+                    // if (!this.state.collectedStories['intro']) {
+                    //     // 📘 처음 접속한 유저 — intro 스토리 없으면 인트로부터 시작
+                    //     this.engine.showIntroStart();
+                    // } else {
+                    //     // ✅ 오디오 권한이 이미 있다면 자동으로 이어서 시작
+                    //     if (hasAudioUnlock) {
+                    //         this.engine.startLevel(this.state.level).then(() => {
+                    //             requestAnimationFrame(this.engine.update.bind(this.engine));
+                    //         });
+                    //     } else {
+                    //         // 🔸 오디오 권한이 없으면 intro 화면만 띄워서 클릭으로 획득
+                    //         this.engine.showIntroStart();
+                    //     }
+                    // }
+
+                    // 게임 시작
+                    // if (!this.state.collectedStories['intro']) {
+                    //     this.engine.showIntroStart();
+                    // } else {
+                    //     this.engine.startLevel(this.state.level).then(() => {
+                    //         requestAnimationFrame(this.engine.update.bind(this.engine));
+                    //     });
+                    // }
 
                     // 디버그용 전역 접근
                     window._GAME = {
@@ -1544,86 +1515,16 @@
                         resetSpawnSession: () => { this.storage.resetSpawnSession(); alert('spawn session reset'); }
                     };
 
+                    document.getElementById('bgmToggle').addEventListener('click', () => {
+                        MazeGame.audio.toggle();
+                    });
+
+
+
+
                 }, 200); // ✅ 약간의 지연으로 모바일 localStorage 준비 시간 확보
             }
         }
-
-
-        //     init() {
-        //         // DOM 요소 캐싱
-        //         this.dom = {
-        //             gameCanvas: document.getElementById('game'),
-        //             ctx: document.getElementById('game').getContext('2d'),
-        //             miniCanvas: document.getElementById('miniMap'),
-        //             miniCtx: document.getElementById('miniMap').getContext('2d'),
-        //             overlay: document.getElementById('overlay'),
-        //             overlayPanel: document.getElementById('overlayPanel'),
-        //             codexOverlay: document.getElementById('codexOverlay'),
-        //             codexPanel: document.getElementById('codexPanel'),
-        //             codexBtn: document.getElementById('codexBtn'),
-        //             homeBtn: document.getElementById('homeBtn'),
-        //             freshStartBtn: document.getElementById('freshStartBtn'),
-        //             levelText: document.getElementById('levelText'),
-        //             itemKeyEl: document.getElementById('itemKeyEl'),
-        //             itemCompassEl: document.getElementById('itemCompassEl'),
-        //             joystick: document.getElementById('joystick'),
-        //             stick: document.getElementById('stick')
-        //         };
-
-        //         // 이미지 객체 초기화
-        //         this.state.itemImages["note"].src = "img/item/Letter.png";
-        //         this.state.itemImages["key"].src = "img/item/Bread.png";
-        //         ["1x1", "1x2", "1x3", "2x1", "3x1"].forEach(key => this.state.blockImages[key] = new Image());
-
-        //         // 이벤트 리스너 바인딩
-        //         document.getElementById('resetSpawn').addEventListener('click', () => {
-        //             this.storage.resetSpawnSession();
-        //             this.ui.showToast('세션 스폰 순서 초기화 완료.');
-        //         });
-        //         this.dom.codexBtn.addEventListener('click', () => this.codex.open());
-        //         this.dom.homeBtn.addEventListener('click', () => this.engine.showIntroStart());
-        //         this.dom.freshStartBtn.addEventListener('click', () => {
-        //             if (!confirm('정말 처음부터 시작하시겠습니까? (도감/획득한 쪽지 모두 초기화됩니다)')) return;
-        //             this.storage.resetCollectedStories();
-        //             this.storage.resetSpawnSession();
-        //             this.storage.resetLevelProgress(); // ✅ 레벨 초기화 추가
-        //             this.ui.updateHud();
-        //             this.ui.showToast('도감이 초기화되었습니다.');
-        //             this.engine.showIntroStart();
-        //         });
-
-        //         // 초기 데이터 로드 및 설정
-        //         this.storage.loadStories();
-        //         this.storage.loadLevel(); // ✅ 마지막 레벨 불러오기
-        //         this.input.init();
-        //         this.ui.updateHud();
-        //         this.state.lastTime = performance.now();
-
-        //         // 게임 시작
-        //         if (!this.state.collectedStories['intro']) {
-        //             this.engine.showIntroStart();
-        //         } else {
-        //             // startLevel()이 완료되기를 기다린 후, 게임 루프를 시작합니다.
-        //             this.engine.startLevel(this.state.level).then(() => {
-        //                 requestAnimationFrame(this.engine.update.bind(this.engine));
-        //             });
-        //         }
-        //         // // 게임 시작
-        //         // if (!this.state.collectedStories['intro']) {
-        //         //     this.engine.showIntroStart();
-        //         // } else {
-        //         //     this.engine.startLevel(this.state.level);
-        //         //     requestAnimationFrame(this.engine.update.bind(this.engine));
-        //         // }
-
-        //         // 디버그용 전역 접근
-        //         window._GAME = {
-        //             getState: () => this.state,
-        //             resetStories: () => { this.storage.resetCollectedStories(); alert('stories reset'); },
-        //             resetSpawnSession: () => { this.storage.resetSpawnSession(); alert('spawn session reset'); }
-        //         };
-        //     }
-        // };
 
         // DOM이 로드된 후 게임을 초기화합니다.
         window.addEventListener('DOMContentLoaded', () => {
