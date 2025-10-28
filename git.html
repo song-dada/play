@@ -1530,66 +1530,11 @@
                             //     });
                             // }
                             // // --- 🚨 변경할 부분 끝 🚨 ---
-
-                            // // 🔸 오디오 권한이 없으면, 권한 획득을 위한 오버레이를 띄웁니다.
-                            // const { overlayPanel, overlay } = this.dom;
-                            // const currentLevel = this.state.level;
-
-                            // // 인트로 텍스트 대신 '이어서 시작' 메시지 사용
-                            // overlayPanel.innerHTML = `
-                            //     <h3 style="margin:0 0 6px">게임 로드됨</h3>
-                            //     <p>레벨 ${currentLevel}에서 이어서 시작합니다.</p>
-                            //     <div class="actions">
-                            //         <p>소리를 켜고 플레이하려면 '이어서 시작' 버튼을 눌러주세요.</p>
-                            //         <button class="primary" id="continueBtn">이어서 시작</button>
-                            //     </div>`;
-
-                            // // 👈 🚨 HTML 구성을 마친 후, 이 위치에서 CSS를 적용합니다.
-                            // overlay.style.display = 'flex';
-
-                            // document.getElementById('continueBtn').onclick = () => {
-                            //     // ... (나머지 로직은 그대로 유지)
-                            //     overlay.style.display = 'none';
-                            //     overlayPanel.innerHTML = '';
-                            //     // ... (BGM 권한 획득 및 startLevel 호출)
-
-                            //     const bgm = document.getElementById('bgm');
-                            //     if (bgm && bgm.paused) {
-                            //         bgm.volume = 0; // 무음으로 재생
-                            //         bgm.play().then(() => {
-                            //             bgm.pause(); // 일단 정지 (이 시점에서 autoplay 허용됨)
-                            //             bgm.currentTime = 0;
-                            //             bgm.volume = 0.4; // 실제 재생 시 볼륨 복원
-                            //             localStorage.setItem('audioUnlocked', 'true');
-                            //             console.log('🎵 오디오 권한 획득 (이어서 시작)');
-                            //         }).catch(err => console.warn('🔇 BGM 허용 실패:', err));
-                            //     }
-
-                            //     // 루프 다시 시작 및 레벨 시작
-                            //     this.state.isRunning = true;
-                            //     this.state.timeUp = false;
-
-                            //     this.engine.startLevel(currentLevel).then(() => {
-                            //         requestAnimationFrame(this.engine.update.bind(this.engine));
-                            //     });
-                            // }
                             // 🔸 오디오 권한이 없으면, 권한 획득을 위한 오버레이를 띄웁니다.
-
-                            // --- 🚨 변경할 부분 시작 🚨 ---
-
-                            // 👈 this.dom 대신 DOM에서 직접 요소 참조를 가져옵니다.
-                            const overlayPanel = document.getElementById('overlayPanel');
-                            const overlay = document.getElementById('overlay');
-
+                            const { overlayPanel, overlay } = this.dom;
                             const currentLevel = this.state.level;
 
-                            if (!overlay || !overlayPanel) {
-                                console.error('Overlay DOM elements not found!');
-                                // 요소가 없으면 여기서 실행 중단
-                                return;
-                            }
-
-                            // 1. 오버레이 패널에 HTML 콘텐츠 설정
+                            // 인트로 텍스트 대신 '이어서 시작' 메시지 사용
                             overlayPanel.innerHTML = `
                                 <h3 style="margin:0 0 6px">게임 로드됨</h3>
                                 <p>레벨 ${currentLevel}에서 이어서 시작합니다.</p>
@@ -1598,32 +1543,28 @@
                                     <button class="primary" id="continueBtn">이어서 시작</button>
                                 </div>`;
 
-                            // 2. 오버레이 표시 (display를 'flex'로 설정)
+                            // 👈 🚨 HTML 구성을 마친 후, 이 위치에서 CSS를 적용합니다.
                             overlay.style.display = 'flex';
-                            // // ✅ 한 프레임 뒤에 HUD 표시 (모바일에서 렌더링 확정 보장)
-                            // requestAnimationFrame(() => {
-                            //     this.ui.showToast('게임 로드됨');
-                            // });
-                            // overlay.style.setProperty('display', 'flex', 'important');
 
-                            // 3. 버튼에 이벤트 리스너 연결
                             document.getElementById('continueBtn').onclick = () => {
-                                // ... (기존 BGM 권한 획득 및 startLevel 로직)
-                                overlay.style.display = 'none'; // 오버레이 숨기기
+                                // ... (나머지 로직은 그대로 유지)
+                                overlay.style.display = 'none';
                                 overlayPanel.innerHTML = '';
+                                // ... (BGM 권한 획득 및 startLevel 호출)
 
                                 const bgm = document.getElementById('bgm');
                                 if (bgm && bgm.paused) {
-                                    bgm.volume = 0;
+                                    bgm.volume = 0; // 무음으로 재생
                                     bgm.play().then(() => {
-                                        bgm.pause();
+                                        bgm.pause(); // 일단 정지 (이 시점에서 autoplay 허용됨)
                                         bgm.currentTime = 0;
-                                        bgm.volume = 0.4;
+                                        bgm.volume = 0.4; // 실제 재생 시 볼륨 복원
                                         localStorage.setItem('audioUnlocked', 'true');
                                         console.log('🎵 오디오 권한 획득 (이어서 시작)');
                                     }).catch(err => console.warn('🔇 BGM 허용 실패:', err));
                                 }
 
+                                // 루프 다시 시작 및 레벨 시작
                                 this.state.isRunning = true;
                                 this.state.timeUp = false;
 
@@ -1631,7 +1572,6 @@
                                     requestAnimationFrame(this.engine.update.bind(this.engine));
                                 });
                             }
-                            // --- 🚨 변경할 부분 끝 🚨 ---
                         }
                     }
                     // }
