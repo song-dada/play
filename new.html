@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>랜덤 미로 게임 (사운드 수정 2차)</title>
+    <title>랜덤 미로 게임 (사운드 수정 3차)</title>
     <link rel="stylesheet" href="css/new.css">
 </head>
 
@@ -281,18 +281,22 @@
                         overlay.style.display = 'none';
                         MazeGame.state.timeUp = false;
 
-                        // ✅ 1) 오디오 권한/플래그 허용(사용자 클릭 컨텍스트)
-                        // (옵션) 로컬 플래그를 켜 두면 이후 자동 재생을 허용하는 로직과 일관됩니다.
-                        localStorage.setItem('audioUnlocked', 'true');   // optional but helpful
-                        MazeGame.state.audioReady = true;                 // playBGM 내부에서 검사할 경우 대비
+                        // ✅ 오디오 권한 플래그 설정 (브라우저 허용 후 자동 재생 가능)
+                        localStorage.setItem('audioUnlocked', 'true');
+                        MazeGame.state.audioReady = true;
 
-                        // ✅ 2) 레벨에 맞는 BGM을 설정하고 재생 요청
-                        MazeGame.audio.playBGM(MazeGame.state.level);
+                        // ✅ 레벨에 맞는 BGM 지정 및 재생
+                        if (MazeGame.audio && typeof MazeGame.audio.playBGM === 'function') {
+                            MazeGame.audio.playBGM(MazeGame.state.level);
+                        } else {
+                            console.warn('⚠️ playBGM 함수가 존재하지 않거나 초기화되지 않았습니다.');
+                        }
 
-                        // ✅ 3) 게임 재시작
+                        // ✅ 게임 재시작
                         MazeGame.engine.startLevel(MazeGame.state.level);
                         requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
                     };
+
 
                     // restartBtn.onclick = () => {
                     //     overlay.style.display = 'none';
