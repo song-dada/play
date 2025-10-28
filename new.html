@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>랜덤 미로 게임 (사운드 수정 1차)</title>
+    <title>랜덤 미로 게임 (사운드 수정 2차)</title>
     <link rel="stylesheet" href="css/new.css">
 </head>
 
@@ -281,23 +281,40 @@
                         overlay.style.display = 'none';
                         MazeGame.state.timeUp = false;
 
-                        // 🔹 오디오 권한 및 재생 처리 (클릭 이벤트 내부 — 안전)
-                        const bgm = document.getElementById('bgm');
-                        if (bgm && bgm.paused) {
-                            bgm.volume = 0.4;
-                            bgm.play()
-                                .then(() => {
-                                    localStorage.setItem('audioUnlocked', 'true');
-                                    console.log('🎵 오디오 권한 획득 및 BGM 재생 시작');
-                                })
-                                .catch(e => console.warn('BGM 재생 실패:', e));
-                        }
+                        // ✅ 1) 오디오 권한/플래그 허용(사용자 클릭 컨텍스트)
+                        // (옵션) 로컬 플래그를 켜 두면 이후 자동 재생을 허용하는 로직과 일관됩니다.
+                        localStorage.setItem('audioUnlocked', 'true');   // optional but helpful
+                        MazeGame.state.audioReady = true;                 // playBGM 내부에서 검사할 경우 대비
 
-                        // 🔹 이후 게임 재시작 로직
+                        // ✅ 2) 레벨에 맞는 BGM을 설정하고 재생 요청
+                        MazeGame.audio.playBGM(MazeGame.state.level);
+
+                        // ✅ 3) 게임 재시작
                         MazeGame.engine.startLevel(MazeGame.state.level);
-                        // .bind(MazeGame.engine)을 추가하여 'this'를 명시적으로 바인딩합니다.
                         requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
                     };
+
+                    // restartBtn.onclick = () => {
+                    //     overlay.style.display = 'none';
+                    //     MazeGame.state.timeUp = false;
+
+                    //     // 🔹 오디오 권한 및 재생 처리 (클릭 이벤트 내부 — 안전)
+                    //     const bgm = document.getElementById('bgm');
+                    //     if (bgm && bgm.paused) {
+                    //         bgm.volume = 0.4;
+                    //         bgm.play()
+                    //             .then(() => {
+                    //                 localStorage.setItem('audioUnlocked', 'true');
+                    //                 console.log('🎵 오디오 권한 획득 및 BGM 재생 시작');
+                    //             })
+                    //             .catch(e => console.warn('BGM 재생 실패:', e));
+                    //     }
+
+                    //     // 🔹 이후 게임 재시작 로직
+                    //     MazeGame.engine.startLevel(MazeGame.state.level);
+                    //     // .bind(MazeGame.engine)을 추가하여 'this'를 명시적으로 바인딩합니다.
+                    //     requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
+                    // };
 
                     actions.appendChild(restartBtn);
                     const exitBtn = document.createElement('button'); exitBtn.className = 'ghost'; exitBtn.style.marginLeft = '8px'; exitBtn.textContent = '종료';
