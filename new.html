@@ -280,6 +280,20 @@
                     restartBtn.onclick = () => {
                         overlay.style.display = 'none';
                         MazeGame.state.timeUp = false;
+
+                        // 🔹 오디오 권한 및 재생 처리 (클릭 이벤트 내부 — 안전)
+                        const bgm = document.getElementById('bgm');
+                        if (bgm && bgm.paused) {
+                            bgm.volume = 0.4;
+                            bgm.play()
+                                .then(() => {
+                                    localStorage.setItem('audioUnlocked', 'true');
+                                    console.log('🎵 오디오 권한 획득 및 BGM 재생 시작');
+                                })
+                                .catch(e => console.warn('BGM 재생 실패:', e));
+                        }
+
+                        // 🔹 이후 게임 재시작 로직
                         MazeGame.engine.startLevel(MazeGame.state.level);
                         // .bind(MazeGame.engine)을 추가하여 'this'를 명시적으로 바인딩합니다.
                         requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
@@ -1156,7 +1170,7 @@
                         // 모든 이미지 로드 완료 후 실행
                         Promise.all(loadPromises).then(() => {
                             state.level = lv;
-                            MazeGame.audio.playBGM(lv); // ✅ 이 줄을 추가하세요
+                            // MazeGame.audio.playBGM(lv); // ✅ 이 줄을 추가하세요
                             state.cols = 21 + (lv - 1) * 2;
                             state.rows = 21 + (lv - 1) * 2;
                             if (state.cols % 2 === 0) state.cols++;
@@ -1175,7 +1189,7 @@
 
                             resolve();
 
-                            MazeGame.audio.playBGM(lv); // ✅ 이 줄을 추가하세요
+                            // MazeGame.audio.playBGM(lv); // ✅ 이 줄을 추가하세요
                         });
 
                     });
