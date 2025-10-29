@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>랜덤 미로 게임 (4차 수정)</title>
+    <title>랜덤 미로 게임 (5차 수정)</title>
     <link rel="stylesheet" href="css/new.css">
 </head>
 
@@ -352,6 +352,64 @@
                 //     bgm.load();
                 //     bgm.play().catch(e => console.warn('BGM 재생 실패:', e));
                 // },
+                // playBGM(level) {
+                //     const bgm = document.getElementById('bgm');
+                //     if (!bgm) return;
+
+                //     let src = '';
+                //     if (level >= 1 && level <= 3) src = 'audio/bgm_SCP-x7x.mp3';
+                //     else if (level >= 4 && level <= 5) src = 'audio/bgm_Despair_and_Triumph.mp3';
+                //     else if (level >= 6 && level <= 12) src = 'audio/bgm_SCP-x5x.mp3';
+                //     else if (level >= 13 && level <= 15) src = 'audio/bgm_SCP-x6x.mp3';
+                //     else src = 'audio/bgm_Ossuary_6_Air.mp3';
+
+                //     // 1. 이미 BGM 파일 로딩 중이거나 재생 중이면 중단
+                //     bgm.pause();
+                //     bgm.src = src;
+                //     bgm.volume = 0.4;
+
+                //     // 2. 권한이 없으면, 권한을 획득하는 함수를 실행하고 끝냅니다.
+                //     if (!MazeGame.state.audioReady) {
+                //         console.warn('🎧 오디오 권한 획득이 필요합니다.');
+                //         // 이 권한 획득 로직은 startBtn의 onClick 이벤트로 옮기는 것이 가장 좋습니다.
+
+                //         // playBGM 내부에서 처리해야 한다면:
+                //         const tryPlay = () => {
+                //             MazeGame.state.audioReady = true;
+                //             // 권한 획득 후 BGM을 다시 로드/재생 시도 (자기 자신을 재호출)
+                //             MazeGame.audio.playBGM(level);
+                //             document.removeEventListener('click', tryPlay);
+                //             document.removeEventListener('touchstart', tryPlay);
+                //         };
+                //         document.addEventListener('click', tryPlay);
+                //         document.addEventListener('touchstart', tryPlay);
+                //         return; // 👈 권한이 없으면 로드/재생을 시도하지 않고 종료
+                //     }
+
+                //     // 3. 권한이 있다면: 로딩 완료를 보장한 후 재생을 시도
+                //     // 기존 리스너 제거 (중복 이벤트 방지)
+                //     const clone = bgm.cloneNode(true);
+                //     bgm.parentNode.replaceChild(clone, bgm);
+                //     const newBgm = clone;
+
+                //     // 로딩 완료를 기다리는 리스너 설정
+                //     newBgm.addEventListener('canplaythrough', function attemptPlay() {
+                //         newBgm.play()
+                //             .then(() => {
+                //                 // 성공적으로 재생 시작
+                //                 localStorage.setItem('audioUnlocked', 'true');
+                //             })
+                //             .catch(e => {
+                //                 // 권한을 얻었지만 재생 실패 (다른 이유), 다음 클릭을 유도
+                //                 console.error('BGM 재생 실패 (로딩 완료 후):', e);
+                //                 localStorage.setItem('audioUnlocked', 'false');
+                //             });
+                //     }, { once: true });
+
+                //     // 로드 시작
+                //     newBgm.load();
+                // },
+
                 playBGM(level) {
                     const bgm = document.getElementById('bgm');
                     if (!bgm) return;
@@ -363,51 +421,93 @@
                     else if (level >= 13 && level <= 15) src = 'audio/bgm_SCP-x6x.mp3';
                     else src = 'audio/bgm_Ossuary_6_Air.mp3';
 
-                    // 1. 이미 BGM 파일 로딩 중이거나 재생 중이면 중단
+                    // // 1. 기존 오디오 엘리먼트를 복제하고 교체하여 모든 기존 이벤트와 상태를 초기화
+                    // const newBgm = bgm.cloneNode(true);
+                    // bgm.parentNode.replaceChild(newBgm, bgm);
+
+                    // // 2. 권한이 있다면: 로딩 완료를 보장한 후 재생을 시도
+                    // if (MazeGame.state.audioReady) {
+                    //     newBgm.src = src;
+                    //     newBgm.volume = 0.4;
+
+                    //     newBgm.addEventListener('canplaythrough', function attemptPlay() {
+                    //         newBgm.play()
+                    //             .then(() => {
+                    //                 localStorage.setItem('audioUnlocked', 'true');
+                    //             })
+                    //             .catch(e => {
+                    //                 console.error('BGM 재생 실패 (로딩 완료 후):', e);
+                    //                 localStorage.setItem('audioUnlocked', 'false');
+                    //             });
+                    //     }, { once: true });
+
+                    //     newBgm.load(); // 로드 시작
+                    // } else {
+                    //     // 3. 권한이 없다면: 클릭 이벤트 리스너만 설정하고 종료
+                    //     // 이 부분은 startLevel이 아닌 startBtn.onclick에서 처리하는 것이 더 좋지만, 
+                    //     // 현재 로직을 유지한다면 다음과 같이 정리합니다.
+
+                    //     console.warn('🎧 아직 오디오 허용 안 됨 — 다음 클릭 시 재시도 예정');
+                    //     const tryPlay = () => {
+                    //         MazeGame.state.audioReady = true;
+                    //         MazeGame.audio.playBGM(level);
+                    //         document.removeEventListener('click', tryPlay);
+                    //         document.removeEventListener('touchstart', tryPlay);
+                    //     };
+                    //     document.addEventListener('click', tryPlay);
+                    //     document.addEventListener('touchstart', tryPlay);
+                    //     return;
+                    // }
+                    // 1. 확실하게 이전 재생 정지
                     bgm.pause();
-                    bgm.src = src;
-                    bgm.volume = 0.4;
+                    bgm.currentTime = 0; // 재생 위치 초기화
 
-                    // 2. 권한이 없으면, 권한을 획득하는 함수를 실행하고 끝냅니다.
-                    if (!MazeGame.state.audioReady) {
-                        console.warn('🎧 오디오 권한 획득이 필요합니다.');
-                        // 이 권한 획득 로직은 startBtn의 onClick 이벤트로 옮기는 것이 가장 좋습니다.
+                    // 2. 이전에 등록되었을 수 있는 'canplaythrough' 이벤트 리스너를 제거합니다.
+                    // (⚠️ 주의: 익명 함수로 등록했다면 제거가 어렵습니다. Named Function으로 변경해야 합니다.)
+                    // 가장 확실한 방법은, 로딩을 담당할 함수를 외부(혹은 내부)에 명시적으로 정의하는 것입니다.
 
-                        // playBGM 내부에서 처리해야 한다면:
+                    function handleCanPlayThrough() {
+                        // 이벤트가 발생한 후 즉시 자신을 제거
+                        bgm.removeEventListener('canplaythrough', handleCanPlayThrough);
+
+                        bgm.play()
+                            .then(() => {
+                                localStorage.setItem('audioUnlocked', 'true');
+                            })
+                            .catch(e => {
+                                console.error('BGM 재생 실패 (로딩 완료 후):', e);
+                                localStorage.setItem('audioUnlocked', 'false');
+                            });
+                    }
+
+                    // 3. 권한이 있다면: 로딩 완료를 보장한 후 재생을 시도
+                    if (MazeGame.state.audioReady) {
+                        // 이미 bgm.src가 이전 오디오의 src와 다를 경우에만 새로운 로딩 시도
+                        if (bgm.src !== src) {
+                            bgm.src = src;
+                            bgm.volume = 0.4;
+
+                            // 새로운 이벤트 리스너 등록
+                            bgm.addEventListener('canplaythrough', handleCanPlayThrough);
+                            bgm.load(); // 로드 시작
+                        } else {
+                            // src가 같다면, 이미 로드되었으므로 바로 재생 시도
+                            bgm.play().catch(e => console.warn('BGM 재생 실패:', e));
+                        }
+
+                    } else {
+                        // 4. 권한이 없다면: 클릭 이벤트 리스너만 설정 (이전 로직 유지)
+                        console.warn('🎧 아직 오디오 허용 안 됨 — 다음 클릭 시 재시도 예정');
                         const tryPlay = () => {
                             MazeGame.state.audioReady = true;
-                            // 권한 획득 후 BGM을 다시 로드/재생 시도 (자기 자신을 재호출)
                             MazeGame.audio.playBGM(level);
                             document.removeEventListener('click', tryPlay);
                             document.removeEventListener('touchstart', tryPlay);
                         };
                         document.addEventListener('click', tryPlay);
                         document.addEventListener('touchstart', tryPlay);
-                        return; // 👈 권한이 없으면 로드/재생을 시도하지 않고 종료
+                        return;
                     }
-
-                    // 3. 권한이 있다면: 로딩 완료를 보장한 후 재생을 시도
-                    // 기존 리스너 제거 (중복 이벤트 방지)
-                    const clone = bgm.cloneNode(true);
-                    bgm.parentNode.replaceChild(clone, bgm);
-                    const newBgm = clone;
-
-                    // 로딩 완료를 기다리는 리스너 설정
-                    newBgm.addEventListener('canplaythrough', function attemptPlay() {
-                        newBgm.play()
-                            .then(() => {
-                                // 성공적으로 재생 시작
-                                localStorage.setItem('audioUnlocked', 'true');
-                            })
-                            .catch(e => {
-                                // 권한을 얻었지만 재생 실패 (다른 이유), 다음 클릭을 유도
-                                console.error('BGM 재생 실패 (로딩 완료 후):', e);
-                                localStorage.setItem('audioUnlocked', 'false');
-                            });
-                    }, { once: true });
-
-                    // 로드 시작
-                    newBgm.load();
                 },
                 // 📍 index.html: MazeGame.audio 객체 내부
                 // playBGM(level) {
@@ -1418,16 +1518,20 @@
                     const hasAudioUnlock = localStorage.getItem('audioUnlocked') === 'true';
                     const hasCollectedIntro = !!this.state.collectedStories['intro'];
 
+                    // // ✅ 게임 시작 분기 처리 (가장 핵심)
+                    // if (hasCollectedIntro && hasAudioUnlock) {
+                    //     // 🟢 Case 1: 자동 시작 (권한 있음)
+                    //     this.engine.startLevel(this.state.level).then(() => {
+                    //         requestAnimationFrame(this.engine.update.bind(this.engine));
+                    //     });
+                    // } else {
+                    //     // 🔴 Case 2 & 3: 처음이거나, 오디오 권한이 없으면 무조건 클릭 유도 화면 표시
+                    //     this.engine.showIntroStart();
+                    // }
+
                     // ✅ 게임 시작 분기 처리 (가장 핵심)
-                    if (hasCollectedIntro && hasAudioUnlock) {
-                        // 🟢 Case 1: 자동 시작 (권한 있음)
-                        this.engine.startLevel(this.state.level).then(() => {
-                            requestAnimationFrame(this.engine.update.bind(this.engine));
-                        });
-                    } else {
-                        // 🔴 Case 2 & 3: 처음이거나, 오디오 권한이 없으면 무조건 클릭 유도 화면 표시
-                        this.engine.showIntroStart();
-                    }
+                    // 🔴 무조건 인트로 오버레이를 띄워 사용자에게 시작/이어하기를 선택하도록 유도합니다.
+                    this.engine.showIntroStart();
 
                     document.getElementById('bgmToggle').addEventListener('click', () => {
                         MazeGame.audio.toggle();
