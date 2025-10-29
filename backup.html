@@ -321,37 +321,6 @@
 
             // MazeGame 객체 내부에 audio 모듈 추가
             audio: {
-                // playBGM(level) {
-                //     const bgm = document.getElementById('bgm');
-                //     if (!bgm) return;
-
-                //     let src = '';
-                //     if (level >= 1 && level <= 3) src = 'audio/bgm_SCP-x7x.mp3';
-                //     else if (level >= 4 && level <= 5) src = 'audio/bgm_Despair_and_Triumph.mp3';
-                //     else if (level >= 6 && level <= 12) src = 'audio/bgm_SCP-x5x.mp3';
-                //     else if (level >= 13 && level <= 15) src = 'audio/bgm_SCP-x6x.mp3';
-                //     else src = 'audio/bgm_Ossuary_6_Air.mp3';
-
-                //     // 🔹 유저 허용 없으면 재생 예약만
-                //     if (!MazeGame.state.audioReady) {
-                //         console.warn('🎧 아직 오디오 허용 안 됨 — 다음 클릭 시 재시도 예정');
-                //         const tryPlay = () => {
-                //             MazeGame.state.audioReady = true;
-                //             MazeGame.audio.playBGM(level);
-                //             document.removeEventListener('click', tryPlay);
-                //             document.removeEventListener('touchstart', tryPlay);
-                //         };
-                //         document.addEventListener('click', tryPlay);
-                //         document.addEventListener('touchstart', tryPlay);
-                //         return;
-                //     }
-
-                //     bgm.pause();
-                //     bgm.src = src;
-                //     bgm.volume = 0.4;
-                //     bgm.load();
-                //     bgm.play().catch(e => console.warn('BGM 재생 실패:', e));
-                // },
                 playBGM(level) {
                     const bgm = document.getElementById('bgm');
                     if (!bgm) return;
@@ -363,72 +332,26 @@
                     else if (level >= 13 && level <= 15) src = 'audio/bgm_SCP-x6x.mp3';
                     else src = 'audio/bgm_Ossuary_6_Air.mp3';
 
-                    // 1. 이미 BGM 파일 로딩 중이거나 재생 중이면 중단
-                    bgm.pause();
-                    bgm.src = src;
-                    bgm.volume = 0.4;
-
-                    // 2. 권한이 없으면, 권한을 획득하는 함수를 실행하고 끝냅니다.
+                    // 🔹 유저 허용 없으면 재생 예약만
                     if (!MazeGame.state.audioReady) {
-                        console.warn('🎧 오디오 권한 획득이 필요합니다.');
-                        // 이 권한 획득 로직은 startBtn의 onClick 이벤트로 옮기는 것이 가장 좋습니다.
-
-                        // playBGM 내부에서 처리해야 한다면:
+                        console.warn('🎧 아직 오디오 허용 안 됨 — 다음 클릭 시 재시도 예정');
                         const tryPlay = () => {
                             MazeGame.state.audioReady = true;
-                            // 권한 획득 후 BGM을 다시 로드/재생 시도 (자기 자신을 재호출)
                             MazeGame.audio.playBGM(level);
                             document.removeEventListener('click', tryPlay);
                             document.removeEventListener('touchstart', tryPlay);
                         };
                         document.addEventListener('click', tryPlay);
                         document.addEventListener('touchstart', tryPlay);
-                        return; // 👈 권한이 없으면 로드/재생을 시도하지 않고 종료
+                        return;
                     }
 
-                    // 3. 권한이 있다면: 로딩 완료를 보장한 후 재생을 시도
-                    // 기존 리스너 제거 (중복 이벤트 방지)
-                    const clone = bgm.cloneNode(true);
-                    bgm.parentNode.replaceChild(clone, bgm);
-                    const newBgm = clone;
-
-                    // 로딩 완료를 기다리는 리스너 설정
-                    newBgm.addEventListener('canplaythrough', function attemptPlay() {
-                        newBgm.play()
-                            .then(() => {
-                                // 성공적으로 재생 시작
-                                localStorage.setItem('audioUnlocked', 'true');
-                            })
-                            .catch(e => {
-                                // 권한을 얻었지만 재생 실패 (다른 이유), 다음 클릭을 유도
-                                console.error('BGM 재생 실패 (로딩 완료 후):', e);
-                                localStorage.setItem('audioUnlocked', 'false');
-                            });
-                    }, { once: true });
-
-                    // 로드 시작
-                    newBgm.load();
+                    bgm.pause();
+                    bgm.src = src;
+                    bgm.volume = 0.4;
+                    bgm.load();
+                    bgm.play().catch(e => console.warn('BGM 재생 실패:', e));
                 },
-                // 📍 index.html: MazeGame.audio 객체 내부
-                // playBGM(level) {
-                //     const bgm = document.getElementById('bgm');
-                //     if (!bgm) return;
-
-                //     // ... (레벨에 따른 src 경로 설정 로직 유지) ...
-
-                //     // BGM 교체 및 로드
-                //     // ... (bgm.pause(), bgm.src = src, bgm.volume = 0.4, bgm.load() 유지) ...
-
-                //     // 재생 시도 (권한 없으면 실패)
-                //     bgm.play()
-                //         .then(() => {
-                //             localStorage.setItem('audioUnlocked', 'true');
-                //         })
-                //         .catch(e => {
-                //             // 🚨 실패 시, 다음 클릭을 유도하도록 localStorage 상태를 변경
-                //             localStorage.setItem('audioUnlocked', 'false');
-                //         });
-                // },
 
 
                 stopBGM() {
@@ -719,7 +642,19 @@
                         e.preventDefault();
                         this.endJoy();
                     });
+                    //stick.addEventListener('touchend', e => {
+                    //    e.preventDefault();
+                    //    MazeGame.state.joyActive = false;
 
+                    //    // ✅ 중앙 복귀 (사라지지 않음)
+                    //    stick.style.left = '50%';
+                    //    stick.style.top = '50%';
+                    //    stick.style.transform = 'translate(-50%, -50%)';
+
+                    //    // ✅ 플레이어 이동 멈춤 (중요!)
+                    //    MazeGame.state.player.vx = 0;
+                    //    MazeGame.state.player.vy = 0;
+                    //});
 
                     joystick.addEventListener('mousedown', e => { e.preventDefault(); this.startJoy(e.clientX, e.clientY); });
                     window.addEventListener('mousemove', e => { if (MazeGame.state.joyActive) this.updateJoy(e.clientX, e.clientY); });
@@ -1240,78 +1175,73 @@
 
                             resolve();
 
-                            // MazeGame.audio.playBGM(lv); // ✅ 이 줄을 추가하세요
+                            MazeGame.audio.playBGM(lv); // ✅ 이 줄을 추가하세요
                         });
 
                     });
                 },
 
 
+                // playBgmForLevel(level) {
+                //     const bgm = document.getElementById('bgm');
+                //     if (!bgm) return;
+
+                //     let src = '';
+                //     if (level >= 1 && level <= 3) src = 'audio/bgm_center.mp3';
+                //     else if (level >= 4 && level <= 5) src = 'audio/bgm_mansion.mp3';
+                //     else if (level >= 6 && level <= 12) src = 'audio/bgm_outer.mp3';
+                //     else if (level >= 13 && level <= 15) src = 'audio/bgm_field.mp3';
+
+                //     if (bgm.src.endsWith(src)) return; // 이미 같은 곡이면 교체 안 함
+
+                //     bgm.pause();
+                //     bgm.src = src;
+                //     bgm.volume = 0.4;
+                //     bgm.load();
+                //     bgm.play().catch(e => console.warn('BGM 재생 실패', e));
+                // },
+
+
                 showIntroStart() {
-                    MazeGame.audio.stopBGM();
-
-                    // 1. 상태 및 텍스트 결정
-                    const isReturningUser = !!MazeGame.state.collectedStories['intro'];
-                    const currentLevel = MazeGame.state.level;
+                    MazeGame.audio.stopBGM(); // ✅ 이 줄을 추가하세요
+                    const introText = MazeGame.config.STORY_TEXTS.intro[0];
                     const { overlayPanel, overlay } = MazeGame.dom;
-
-                    let title, paragraph, buttonText, startLevel;
-
-                    if (isReturningUser) {
-                        // 복귀 유저
-                        title = "게임 로드됨";
-                        paragraph = `레벨 ${currentLevel}에서 이어서 시작합니다.<br>소리를 켜고 플레이하려면 아래 버튼을 눌러주세요.`;
-                        buttonText = "이어서 시작";
-                        startLevel = currentLevel;
-                    } else {
-                        // 신규 유저
-                        title = "프롤로그";
-                        paragraph = MazeGame.config.STORY_TEXTS.intro[0];
-                        buttonText = "게임 시작";
-                        startLevel = 1;
-                    }
-
-                    // 2. 오버레이 HTML 설정 및 표시
-                    overlayPanel.innerHTML = `
-        <h3 style="margin:0 0 6px">${title}</h3>
-        <p>${paragraph}</p>
-        <div class="actions">
-            <button class="primary" id="startBtn">${buttonText}</button>
-        </div>`;
+                    overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>${introText}</p><div class="actions"><button class="primary" id="startBtn">게임 시작</button></div>`;
+                    // overlayPanel.innerHTML = `<h3 style="margin:0 0 6px">프롤로그</h3><p>깊은 미궁 속으로 발을 내딛었다. 시작 버튼을 눌러 탐험을 시작하세요.</p><div class="actions"><button class="primary" id="startBtn">게임 시작</button></div>`;
                     overlay.style.display = 'flex';
 
-                    // 3. 버튼 클릭 핸들러 (유일한 BGM 권한 획득 지점)
                     document.getElementById('startBtn').onclick = () => {
-                        const bgm = document.getElementById('bgm');
-                        let permissionPromise = Promise.resolve();
+                        MazeGame.storage.unlockNote('intro');
 
+                        // ✅ BGM 재생 허용 (사용자 클릭 시 1회 실행)
+                        const bgm = document.getElementById('bgm');
                         if (bgm && bgm.paused) {
-                            bgm.volume = 0;
-                            permissionPromise = bgm.play();
+                            bgm.volume = 0; // 무음으로 재생
+                            bgm.play().then(() => {
+                                bgm.pause(); // 일단 정지 (이 시점에서 autoplay 허용됨)
+                                bgm.currentTime = 0;
+                                bgm.volume = 0.4; // 실제 재생 시 볼륨 복원
+                                localStorage.setItem('audioUnlocked', 'true'); // ✅ 다음부터는 자동 실행 가능
+                                // MazeGame.state.audioReady = true; // ✅ 이제 허용됨
+                            }).catch(err => console.warn('🔇 초기 BGM 허용 실패:', err));
                         }
 
-                        permissionPromise.then(() => {
-                            // 권한 획득 성공 후, 즉시 정지시킵니다.
-                            // play() 요청이 완료된 후 pause()를 호출하므로 AbortError 발생 위험이 낮아집니다.
-                            // if (bgm) {
-                            //     bgm.pause(); // 👈 BGM 정지 추가
-                            //     bgm.currentTime = 0; // 시작 지점으로 돌려 놓기
-                            //     bgm.volume = 0.4; // 실제 재생할 볼륨으로 미리 설정 (선택 사항)
-                            // }
-                            // console.log('🎵 오디오 권한 획득 완료 (클릭)');
-                            // localStorage.setItem('audioUnlocked', 'true');
-                            MazeGame.state.audioReady = true; // 여기서 true로 변경
+                        overlay.style.display = 'none';
+                        overlayPanel.innerHTML = '';
 
-                        }).catch(err => {
-                            // ... (생략) ...
-                        }).finally(() => {
-                            // ... (생략) ...
-                            MazeGame.engine.startLevel(startLevel).then(() => {
-                                requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
-                            });
+                        // ✅ 진행 중 레벨 불러오기
+                        MazeGame.storage.loadLevel();
+
+                        // ✅ 루프 다시 시작
+                        MazeGame.state.isRunning = true;
+                        MazeGame.state.timeUp = false;
+
+                        MazeGame.engine.startLevel(MazeGame.state.level).then(() => {
+                            requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
                         });
                     };
-                }, // ⚠️ 다음 속성(init)과 구분하는 쉼표(,)를 반드시 확인하세요!
+
+                }
             },
 
             /**
@@ -1410,24 +1340,325 @@
                     this.ui.updateHud();
                     this.state.lastTime = performance.now();
 
-                    // 📍 index.html: MazeGame.init() 함수 내부
+                    // ✅ overlay 강제 표시 (모바일에서 초기 렌더 누락 방지)
+                    this.dom.overlay.style.display = 'flex';
 
-                    // ... (this.state.lastTime = performance.now(); 다음)
+                    // ✅ 오디오 허용 상태 확인 및 처리 (터치/클릭 지원)
+                    const bgm = document.getElementById('bgm');
+                    let hasAudioUnlock = localStorage.getItem('audioUnlocked') === 'true';
 
-                    // ✅ 오디오 허용 상태 확인
-                    const hasAudioUnlock = localStorage.getItem('audioUnlocked') === 'true';
-                    const hasCollectedIntro = !!this.state.collectedStories['intro'];
+                    // 🔹 오디오 권한 해제 상태라면, 유저 상호작용 기다리기
+                    function unlockAudio() {
+                        if (!bgm) return;
+                        try {
+                            bgm.volume = 0.4;
+                            bgm.play()
+                                .then(() => {
+                                    console.log('🎵 오디오 권한 획득 (터치/클릭)');
+                                    localStorage.setItem('audioUnlocked', 'true');
+                                    hasAudioUnlock = true;
 
-                    // ✅ 게임 시작 분기 처리 (가장 핵심)
-                    if (hasCollectedIntro && hasAudioUnlock) {
-                        // 🟢 Case 1: 자동 시작 (권한 있음)
-                        this.engine.startLevel(this.state.level).then(() => {
-                            requestAnimationFrame(this.engine.update.bind(this.engine));
-                        });
-                    } else {
-                        // 🔴 Case 2 & 3: 처음이거나, 오디오 권한이 없으면 무조건 클릭 유도 화면 표시
-                        this.engine.showIntroStart();
+                                    // 리스너 제거 (한 번만 실행)
+                                    document.removeEventListener('click', unlockAudio);
+                                    document.removeEventListener('touchstart', unlockAudio);
+                                    document.removeEventListener('pointerdown', unlockAudio);
+                                })
+                                .catch(err => console.warn('BGM 재생 실패:', err));
+                        } catch (err) {
+                            console.warn('BGM play() 예외:', err);
+                        }
                     }
+
+                    // 🔹 권한이 없을 경우: 클릭·터치·포인터 입력을 한 번만 감지
+                    if (!hasAudioUnlock) {
+                        document.addEventListener('click', unlockAudio, { once: true });
+                        document.addEventListener('touchstart', unlockAudio, { once: true });
+                        document.addEventListener('pointerdown', unlockAudio, { once: true });
+                        // } else {
+                        //     // 🔹 이미 권한 있음 — 무음으로 미리 활성화 시도
+                        //     if (bgm && bgm.paused) {
+                        //         bgm.volume = 0;
+                        //         bgm.play().then(() => {
+                        //             bgm.pause();
+                        //             bgm.currentTime = 0;
+                        //             bgm.volume = 0.4;
+                        //             console.log('🎶 오디오 자동활성화');
+                        //         }).catch(() => console.log('🔇 자동재생은 이번 세션에서 차단됨 — 터치 시 재활성화'));
+                        //     }
+                    }
+
+                    // // ✅ 오디오 허용 상태 확인 및 처리
+                    // const bgm = document.getElementById('bgm');
+                    // let hasAudioUnlock = localStorage.getItem('audioUnlocked') === 'true';
+
+                    // const unlockAudio = () => {
+                    //     if (bgm && bgm.paused) {
+                    //         bgm.volume = 0.4;
+                    //         bgm.play()
+                    //             .then(() => {
+                    //                 console.log('🎵 오디오 권한 획득 (터치/클릭)');
+                    //                 localStorage.setItem('audioUnlocked', 'true');
+                    //                 hasAudioUnlock = true;
+
+                    //                 // 한 번만 등록되게 제거
+                    //                 document.removeEventListener('click', unlockAudio);
+                    //                 document.removeEventListener('touchstart', unlockAudio);
+                    //                 document.removeEventListener('pointerdown', unlockAudio);
+                    //             })
+                    //             .catch(err => console.warn('BGM 허용 실패', err));
+                    //     }
+                    // };
+
+                    // // 🔹 오디오 허용 안 된 경우 → 모든 입력방식에 대해 한 번만 등록
+                    // if (!hasAudioUnlock) {
+                    //     document.addEventListener('click', unlockAudio, { once: true });
+                    //     document.addEventListener('touchstart', unlockAudio, { once: true });
+                    //     document.addEventListener('pointerdown', unlockAudio, { once: true });
+                    // } else {
+                    //     // 🔸 이미 허용됨 → 무음으로 미리 활성화
+                    //     if (bgm && bgm.paused) {
+                    //         bgm.volume = 0;
+                    //         bgm.play().then(() => {
+                    //             bgm.pause();
+                    //             bgm.currentTime = 0;
+                    //             bgm.volume = 0.4;
+                    //             console.log('🎶 오디오 자동활성화');
+                    //         }).catch(() => console.log('🔇 자동재생은 이번 세션에서 차단됨 — 터치 시 재활성화'));
+                    //     }
+                    // }
+
+                    // // ✅ 오디오 허용 상태 확인 및 처리
+                    // const hasAudioUnlock = localStorage.getItem('audioUnlocked') === 'true';
+                    // const bgm = document.getElementById('bgm');
+
+                    // if (!hasAudioUnlock) {
+                    //     // 🔸 처음 접속 → 오디오 허용 안 됨 → 시작 버튼 강제로 띄움
+                    //     this.engine.showIntroStart();
+
+                    //     // 🔹 버튼 생성 완료 후 리스너 등록 (DOM 반영 타이밍 보장)
+                    //     const tryBindAudio = () => {
+                    //         const startBtn = document.getElementById('startBtn');
+                    //         if (startBtn) {
+                    //             startBtn.addEventListener('click', () => {
+                    //                 if (bgm && bgm.paused) {
+                    //                     bgm.volume = 0.4;
+                    //                     bgm.play()
+                    //                         .then(() => {
+                    //                             console.log('🎵 오디오 권한 획득');
+                    //                             localStorage.setItem('audioUnlocked', 'true');
+                    //                         })
+                    //                         .catch(err => console.warn('BGM 허용 실패', err));
+                    //                 }
+                    //             }, { once: true });
+                    //         } else {
+                    //             // 버튼이 아직 없으면 약간 늦게 다시 시도
+                    //             setTimeout(tryBindAudio, 100);
+                    //         }
+                    //     };
+                    //     tryBindAudio();
+                    // } else {
+                    //     // 🔸 이미 오디오 허용됨 → 무음으로 미리 활성화
+                    //     if (bgm && bgm.paused) {
+                    //         bgm.volume = 0;
+                    //         bgm.play().then(() => {
+                    //             bgm.pause();
+                    //             bgm.currentTime = 0;
+                    //             bgm.volume = 0.4;
+                    //             console.log('🎶 오디오 자동활성화');
+                    //         }).catch(err => console.warn('BGM 자동활성화 실패', err));
+                    //     }
+                    // }
+
+
+                    // 게임 시작
+                    // const hasAudioUnlock = localStorage.getItem('audioUnlocked') === 'true';
+
+                    if (!this.state.collectedStories['intro']) {
+                        // 📘 처음 접속한 유저 — intro 스토리 없으면 인트로부터 시작
+                        // 이 경우 showIntroStart() 내부에 '시작하기' 버튼이 오디오 권한을 획득하게 됩니다.
+                        this.engine.showIntroStart();
+                    } else {
+                        // 📗 이미 접속했던 유저 (intro 스토리 획득함)
+                        if (hasAudioUnlock) {
+                            // ✅ 오디오 권한이 이미 있다면 자동으로 이어서 시작
+                            this.engine.startLevel(this.state.level).then(() => {
+                                requestAnimationFrame(this.engine.update.bind(this.engine));
+                            });
+                        } else {
+                            // // 🔸 오디오 권한이 없으면, 권한 획득을 위한 오버레이를 띄웁니다.
+                            // // showIntroStart() 함수를 재사용하여 '이어서 시작' 버튼을 띄우고,
+                            // // 이 버튼이 클릭될 때 오디오 권한을 획득하게 합니다.
+
+                            // // --- 🚨 변경할 부분 시작 🚨 ---
+
+                            // const { overlayPanel, overlay } = this.dom;
+                            // const currentLevel = this.state.level;
+
+                            // // 인트로 텍스트 대신 '이어서 시작' 메시지 사용
+                            // overlayPanel.innerHTML = `
+                            //     <h3 style="margin:0 0 6px">게임 로드됨</h3>
+                            //     <p>레벨 ${currentLevel}에서 이어서 시작합니다.</p>
+                            //     <div class="actions">
+                            //         <p>소리를 켜고 플레이하려면 '이어서 시작' 버튼을 눌러주세요.</p>
+                            //         overlay.style.display = 'flex';
+                            //         <button class="primary" id="continueBtn">이어서 시작</button>
+                            //     </div>`;
+
+                            // document.getElementById('continueBtn').onclick = () => {
+                            //     overlay.style.display = 'none';
+                            //     overlayPanel.innerHTML = '';
+
+                            //     // BGM 권한 획득 시도 (showIntroStart() 내부 로직과 유사)
+                            //     const bgm = document.getElementById('bgm');
+                            //     if (bgm && bgm.paused) {
+                            //         bgm.volume = 0; // 무음으로 재생
+                            //         bgm.play().then(() => {
+                            //             bgm.pause(); // 일단 정지 (이 시점에서 autoplay 허용됨)
+                            //             bgm.currentTime = 0;
+                            //             bgm.volume = 0.4; // 실제 재생 시 볼륨 복원
+                            //             localStorage.setItem('audioUnlocked', 'true');
+                            //             console.log('🎵 오디오 권한 획득 (이어서 시작)');
+                            //         }).catch(err => console.warn('🔇 BGM 허용 실패:', err));
+                            //     }
+
+                            //     // 루프 다시 시작 및 레벨 시작
+                            //     this.state.isRunning = true;
+                            //     this.state.timeUp = false;
+
+                            //     this.engine.startLevel(currentLevel).then(() => {
+                            //         requestAnimationFrame(this.engine.update.bind(this.engine));
+                            //     });
+                            // }
+                            // // --- 🚨 변경할 부분 끝 🚨 ---
+
+                            // // 🔸 오디오 권한이 없으면, 권한 획득을 위한 오버레이를 띄웁니다.
+                            // const { overlayPanel, overlay } = this.dom;
+                            // const currentLevel = this.state.level;
+
+                            // // 인트로 텍스트 대신 '이어서 시작' 메시지 사용
+                            // overlayPanel.innerHTML = `
+                            //     <h3 style="margin:0 0 6px">게임 로드됨</h3>
+                            //     <p>레벨 ${currentLevel}에서 이어서 시작합니다.</p>
+                            //     <div class="actions">
+                            //         <p>소리를 켜고 플레이하려면 '이어서 시작' 버튼을 눌러주세요.</p>
+                            //         <button class="primary" id="continueBtn">이어서 시작</button>
+                            //     </div>`;
+
+                            // // 👈 🚨 HTML 구성을 마친 후, 이 위치에서 CSS를 적용합니다.
+                            // overlay.style.display = 'flex';
+
+                            // document.getElementById('continueBtn').onclick = () => {
+                            //     // ... (나머지 로직은 그대로 유지)
+                            //     overlay.style.display = 'none';
+                            //     overlayPanel.innerHTML = '';
+                            //     // ... (BGM 권한 획득 및 startLevel 호출)
+
+                            //     const bgm = document.getElementById('bgm');
+                            //     if (bgm && bgm.paused) {
+                            //         bgm.volume = 0; // 무음으로 재생
+                            //         bgm.play().then(() => {
+                            //             bgm.pause(); // 일단 정지 (이 시점에서 autoplay 허용됨)
+                            //             bgm.currentTime = 0;
+                            //             bgm.volume = 0.4; // 실제 재생 시 볼륨 복원
+                            //             localStorage.setItem('audioUnlocked', 'true');
+                            //             console.log('🎵 오디오 권한 획득 (이어서 시작)');
+                            //         }).catch(err => console.warn('🔇 BGM 허용 실패:', err));
+                            //     }
+
+                            //     // 루프 다시 시작 및 레벨 시작
+                            //     this.state.isRunning = true;
+                            //     this.state.timeUp = false;
+
+                            //     this.engine.startLevel(currentLevel).then(() => {
+                            //         requestAnimationFrame(this.engine.update.bind(this.engine));
+                            //     });
+                            // }
+                            // 🔸 오디오 권한이 없으면, 권한 획득을 위한 오버레이를 띄웁니다.
+
+                            // --- 🚨 변경할 부분 시작 🚨 ---
+
+                            // 👈 this.dom 대신 DOM에서 직접 요소 참조를 가져옵니다.
+                            const overlayPanel = document.getElementById('overlayPanel');
+                            const overlay = document.getElementById('overlay');
+
+                            const currentLevel = this.state.level;
+
+                            if (!overlay || !overlayPanel) {
+                                console.error('Overlay DOM elements not found!');
+                                // 요소가 없으면 여기서 실행 중단
+                                return;
+                            }
+
+                            // 1. 오버레이 패널에 HTML 콘텐츠 설정
+                            overlayPanel.innerHTML = `
+                                <h3 style="margin:0 0 6px">게임 로드됨</h3>
+                                <p>레벨 ${currentLevel}에서 이어서 시작합니다.</p>
+                                <div class="actions">
+                                    <p>소리를 켜고 플레이하려면 '이어서 시작' 버튼을 눌러주세요.</p>
+                                    <button class="primary" id="continueBtn">이어서 시작</button>
+                                </div>`;
+
+                            // 2. 오버레이 표시 (display를 'flex'로 설정)
+                            overlay.style.display = 'flex';
+                            // // ✅ 한 프레임 뒤에 HUD 표시 (모바일에서 렌더링 확정 보장)
+                            // requestAnimationFrame(() => {
+                            //     this.ui.showToast('게임 로드됨');
+                            // });
+                            // overlay.style.setProperty('display', 'flex', 'important');
+
+                            // 3. 버튼에 이벤트 리스너 연결
+                            document.getElementById('continueBtn').onclick = () => {
+                                // ... (기존 BGM 권한 획득 및 startLevel 로직)
+                                overlay.style.display = 'none'; // 오버레이 숨기기
+                                overlayPanel.innerHTML = '';
+
+                                const bgm = document.getElementById('bgm');
+                                if (bgm && bgm.paused) {
+                                    bgm.volume = 0;
+                                    bgm.play().then(() => {
+                                        bgm.pause();
+                                        bgm.currentTime = 0;
+                                        bgm.volume = 0.4;
+                                        localStorage.setItem('audioUnlocked', 'true');
+                                        console.log('🎵 오디오 권한 획득 (이어서 시작)');
+                                    }).catch(err => console.warn('🔇 BGM 허용 실패:', err));
+                                }
+
+                                this.state.isRunning = true;
+                                this.state.timeUp = false;
+
+                                this.engine.startLevel(currentLevel).then(() => {
+                                    requestAnimationFrame(this.engine.update.bind(this.engine));
+                                });
+                            }
+                            // --- 🚨 변경할 부분 끝 🚨 ---
+                        }
+                    }
+                    // }
+
+                    // if (!this.state.collectedStories['intro']) {
+                    //     // 📘 처음 접속한 유저 — intro 스토리 없으면 인트로부터 시작
+                    //     this.engine.showIntroStart();
+                    // } else {
+                    //     // ✅ 오디오 권한이 이미 있다면 자동으로 이어서 시작
+                    //     if (hasAudioUnlock) {
+                    //         this.engine.startLevel(this.state.level).then(() => {
+                    //             requestAnimationFrame(this.engine.update.bind(this.engine));
+                    //         });
+                    //     } else {
+                    //         // 🔸 오디오 권한이 없으면 intro 화면만 띄워서 클릭으로 획득
+                    //         this.engine.showIntroStart();
+                    //     }
+                    // }
+
+                    // 게임 시작
+                    // if (!this.state.collectedStories['intro']) {
+                    //     this.engine.showIntroStart();
+                    // } else {
+                    //     this.engine.startLevel(this.state.level).then(() => {
+                    //         requestAnimationFrame(this.engine.update.bind(this.engine));
+                    //     });
+                    // }
 
                     document.getElementById('bgmToggle').addEventListener('click', () => {
                         MazeGame.audio.toggle();
@@ -1452,11 +1683,11 @@
         // DOM이 로드된 후 게임을 초기화합니다.
         window.addEventListener('DOMContentLoaded', () => {
             MazeGame.init();
-            // document.addEventListener('touchstart', () => {
-            //     const bgm = document.getElementById('bgm');
-            //     bgm.volume = 0.4;
-            //     bgm.play();
-            // }, { once: true });
+            document.addEventListener('touchstart', () => {
+                const bgm = document.getElementById('bgm');
+                bgm.volume = 0.4;
+                bgm.play();
+            }, { once: true });
         });
 
     </script>
