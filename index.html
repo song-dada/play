@@ -146,6 +146,7 @@
                 joyCenter: null,
                 blockImages: {},
                 itemImages: { "note": new Image(), "key": new Image() },
+                roadImages: { "road": new Image() },
                 isRunning: true,
                 audioReady: false,
 
@@ -939,7 +940,7 @@
 
                 draw(nowTs) {
                     const { ctx, gameCanvas } = MazeGame.dom;
-                    const { player, tileSize, rows, cols, maze, goal, items, blockImages, itemImages } = MazeGame.state;
+                    const { player, tileSize, rows, cols, maze, goal, items, blockImages, itemImages, roadImages } = MazeGame.state;
                     ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
                     const offsetX = gameCanvas.width / 2 - player.x * tileSize;
                     const offsetY = gameCanvas.height / 2 - player.y * tileSize;
@@ -982,8 +983,9 @@
                                     visited[y][x] = true;
                                 }
                             } else if (maze[y]?.[x] === 0) {
-                                ctx.fillStyle = "white";
-                                ctx.fillRect(x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize);
+                                // ctx.fillStyle = "#868383FF";
+                                ctx.drawImage(roadImages["road"], x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize);
+                                // ctx.fillRect(x * tileSize + offsetX, y * tileSize + offsetY, tileSize, tileSize);
                             }
                         }
                     }
@@ -1443,6 +1445,7 @@
                     };
 
                     // 이미지 객체 초기화
+                    this.state.roadImages["road"].src = "img/tiles/road.png";
                     this.state.itemImages["note"].src = "img/item/Letter.png";
                     this.state.itemImages["key"].src = "img/item/Bread.png";
                     ["1x1", "1x2", "1x3", "2x1", "3x1"].forEach(key => this.state.blockImages[key] = new Image());
