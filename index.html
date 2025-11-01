@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>랜덤 미로 게임 (6차 수정)</title>
-    <link rel="stylesheet" href="css/new.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 
 <body>
@@ -242,18 +242,8 @@
                         const backBtn = document.createElement('button');
                         backBtn.className = 'secondary'; // "이전" 버튼
                         backBtn.textContent = '이전으로';
-                        // backBtn.onclick = () => {
-                        //     overlay.style.display = 'none'; // 현재 오버레이 닫기
-                        //     // 이전에 봤던 그룹 오버레이(쪽지 모음창)를 다시 엽니다.
-                        //     MazeGame.codex.showGroupOverlay(backContextGroup);
-                        // };
-                        // '뒤로가기' 로직을 담은 함수를 정의합니다.
-                        // let isProcessing = false;
-                        const handleBackButtonClick = (event) => {
-                            // ⚠️ 중복 실행 방지: 터치/클릭 후 리스너를 즉시 제거하여 이중 실행을 막습니다.
-                            // event.currentTarget.removeEventListener('click', handleBackButtonClick);
-                            // event.currentTarget.removeEventListener('touchstart', handleBackButtonClick);
 
+                        const handleBackButtonClick = (event) => {
                             // 1. 모바일 터치 시 기본 동작 방지 (스크롤 막기)
                             if (event.type === 'touchstart') {
                                 event.preventDefault();
@@ -261,85 +251,20 @@
 
                             // --- 기존의 뒤로가기 로직 ---
                             const { overlay } = MazeGame.dom;
-                            // backContextGroup 변수가 이 함수 외부에서 접근 가능한지 확인해야 합니다.
-                            // 만약 이 함수 내부에서 backContextGroup을 사용하려면, 해당 변수가
-                            // 클로저(closure)를 통해 캡처되었거나 객체의 속성으로 접근 가능해야 합니다.
-
                             overlay.style.display = 'none'; // 현재 오버레이 닫기
 
-                            // 이전에 봤던 그룹 오버레이(쪽지 모음창)를 다시 엽니다.
-                            // 이 호출이 완료된 후, 이 리스너를 다시 등록해야 합니다.
                             MazeGame.codex.showGroupOverlay(backContextGroup);
-
-                            // ----------------------------
-                            // // 1. 이미 처리 중이라면 즉시 종료 (짧은 시간 내의 touchstart/click 중복 실행 방지)
-                            // if (isProcessing) return;
-                            // isProcessing = true;
-
-                            // // 2. 🚨 핵심: 짧게 눌렀을 때 click 이벤트가 무시되지 않도록 touchstart의 기본 동작을 막음
-                            // if (event.type === 'touchstart') {
-                            //     event.preventDefault();
-                            // }
-
-                            // // --- 뒤로가기 로직 ---
-                            // const { overlay } = MazeGame.dom;
-
-                            // // 현재 오버레이 닫기
-                            // overlay.style.display = 'none';
-
-                            // // 이전에 봤던 그룹 오버레이(쪽지 모음창)를 다시 엽니다.
-                            // MazeGame.codex.showGroupOverlay(backContextGroup);
-
-                            // // 3. 플래그 해제: 다음 클릭/터치를 허용하기 위해 잠시 후 리셋
-                            // // 50ms는 touchstart와 click이 처리될 충분한 시간입니다.
-                            // setTimeout(() => { isProcessing = false; }, 50);
-
-                            // ⚠️ 중요: showGroupOverlay가 완료된 후 backBtn에 리스너를 다시 등록하는 로직이 필요할 수 있습니다.
-                            // 도감이 닫힐 때 이 버튼이 제거되고 다시 생성된다면, 재등록 로직은 필요 없습니다.
-                            // 버튼이 DOM에 남아있는 경우, showGroupOverlay 호출 직후 이 리스너를 다시 등록하세요.
-                            // event.currentTarget.addEventListener('touchstart', handleBackButtonClick, { passive: true });
-                            // event.currentTarget.addEventListener('click', handleBackButtonClick);
                         };
 
-                        // 버튼 생성 부분에서 이벤트를 등록합니다.
-                        // ❌ backBtn.onclick = () => { ... } 기존 코드를 제거합니다.
-
-                        // ✅ 새로운 이벤트 리스너 등록
                         backBtn.addEventListener('touchstart', handleBackButtonClick, { passive: false });
                         backBtn.addEventListener('click', handleBackButtonClick);
 
                         actions.appendChild(backBtn); // 왼쪽에 "이전으로"
 
                     } else {
-                        // "이전" 버튼이 없을 경우 공간을 차지할 빈 div를 추가하여 "닫기" 버튼을 오른쪽 정렬
                         actions.appendChild(document.createElement('div'));
                     }
 
-                    // const closeBtn = document.createElement('button');
-                    // closeBtn.className = 'ghost'; // "닫기" 버튼
-                    // closeBtn.textContent = '닫기';
-                    // // closeBtn.onclick = () => { overlay.style.display = 'none'; };
-                    // // ❌ 기존 코드 제거: closeBtn.onclick = () => { overlay.style.display = 'none'; };
-
-                    // // 1. touchstart 이벤트 등록
-                    // closeBtn.addEventListener('touchstart', () => {
-                    //     // ⚠️ 중복 실행을 막기 위해 여기서 click 리스너를 임시로 제거할 수 있습니다.
-                    //     // 하지만 단순 닫기 기능이므로 제거 없이 처리하는 것이 가장 간단합니다.
-                    //     overlay.style.display = 'none';
-                    // }, { passive: true });
-
-                    // // 2. click 이벤트 등록
-                    // closeBtn.addEventListener('click', () => {
-                    //     overlay.style.display = 'none';
-                    // });
-
-                    // actions.appendChild(closeBtn); // 오른쪽에 "닫기"
-                    // overlayPanel.appendChild(actions);
-
-                    // overlay.style.display = 'flex';
-                    // if (autoCloseMs > 0 && !backContextGroup) { // "이전" 버튼이 없으면 자동 닫기 활성화
-                    //     setTimeout(() => { if (overlay.style.display === 'flex') overlay.style.display = 'none'; }, autoCloseMs);
-                    // }
                     const closeBtn = document.createElement('button');
                     closeBtn.className = 'ghost';
                     closeBtn.textContent = '닫기';
@@ -353,14 +278,8 @@
 
                         // 오버레이 닫기
                         overlay.style.display = 'none';
-
-                        // 이 버튼은 오버레이가 닫히면 DOM에서 사라지므로 리스너를 다시 등록할 필요가 없습니다.
                     };
 
-                    // 1. 모바일 환경 최적화: touchstart와 click 모두 handleClose 연결
-                    // passive: true 옵션 제거 (preventDefault 사용 시) 또는 아예 사용하지 않음
-                    // closeBtn.addEventListener('touchstart', handleClose);
-                    // closeBtn.addEventListener('click', handleClose);
                     closeBtn.addEventListener('touchstart', handleClose, { passive: false });
                     closeBtn.addEventListener('click', handleClose);
 
@@ -380,21 +299,7 @@
                     if (message) { const p = document.createElement('p'); p.innerText = message; panel.appendChild(p); }
                     const actions = document.createElement('div'); actions.className = 'actions';
                     const restartBtn = document.createElement('button'); restartBtn.className = 'primary'; restartBtn.textContent = '다시 시작';
-                    // restartBtn.onclick = () => {
-                    //     overlay.style.display = 'none';
-                    //     MazeGame.state.timeUp = false;
-                    //     MazeGame.engine.startLevel(MazeGame.state.level);
-                    //     requestAnimationFrame(MazeGame.engine.update);
-                    // };
-                    // restartBtn.onclick = () => {
-                    //     overlay.style.display = 'none';
-                    //     MazeGame.state.timeUp = false;
-                    //     MazeGame.engine.startLevel(MazeGame.state.level);
-                    //     // .bind(MazeGame.engine)을 추가하여 'this'를 명시적으로 바인딩합니다.
-                    //     requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
-                    // };
 
-                    // const restartBtn = document.createElement('button');
                     restartBtn.className = 'primary';
                     restartBtn.textContent = '다시 시작';
 
@@ -426,31 +331,7 @@
                     actions.appendChild(restartBtn);
                     const exitBtn = document.createElement('button'); exitBtn.className = 'ghost'; exitBtn.style.marginLeft = '8px'; exitBtn.textContent = '종료';
 
-                    // exitBtn.onclick = () => {
-                    //     overlay.style.display = 'none';
-                    //     MazeGame.state.timeUp = false;
-
-                    //     // ✅ 루프 중단
-                    //     MazeGame.state.isRunning = false;
-
-                    //     // ✅ 상태 리셋 (미로, 아이템, 플레이어 등)
-                    //     MazeGame.state.maze = [];
-                    //     MazeGame.state.revealMap = [];
-                    //     MazeGame.state.visitedMap = [];
-                    //     MazeGame.state.items = [];
-                    //     MazeGame.state.hasKey = false;
-                    //     MazeGame.state.hasNoteInCurrentLevel = false;
-                    //     MazeGame.state.levelCleared = false;
-                    //     MazeGame.state.joyActive = false;
-                    //     MazeGame.state.player = { x: 1.5, y: 1.5, size: 0.65, vx: 0, vy: 0 };
-
-                    //     MazeGame.ui.updateHud();
-
-                    //     // ✅ 홈화면 표시
-                    //     MazeGame.engine.showIntroStart();
-                    // };
                     const handleExit = () => {
-                        // ⚠️ 중복 실행 방지: 리스너를 제거합니다.
                         exitBtn.removeEventListener('click', handleExit);
                         exitBtn.removeEventListener('touchstart', handleExit);
 
@@ -460,11 +341,9 @@
                         MazeGame.state.timeUp = false;
                         MazeGame.state.isRunning = false;
 
-                        // ... (상태 리셋 로직) ...
-
+                        // 상태 리셋
                         MazeGame.ui.updateHud();
                         MazeGame.engine.showIntroStart();
-                        // --------------------------
                     };
                     exitBtn.addEventListener('touchstart', handleExit, { passive: true });
                     exitBtn.addEventListener('click', handleExit);
@@ -531,7 +410,6 @@ http://creativecommons.org/licenses/by/4.0/
                     closeBtn.textContent = '닫기';
                     actions.appendChild(closeBtn);
 
-                    // 닫기 버튼 이벤트 등록 (타입 2: 오버레이 버튼 패턴 사용)
                     const handleClose = (event) => {
                         if (event.type === 'touchstart') {
                             event.preventDefault();
@@ -551,95 +429,6 @@ http://creativecommons.org/licenses/by/4.0/
 
             // MazeGame 객체 내부에 audio 모듈 추가
             audio: {
-                // playBGM(level) {
-                //     const bgm = document.getElementById('bgm');
-                //     if (!bgm) return;
-
-                //     let src = '';
-                //     if (level >= 1 && level <= 3) src = 'audio/bgm_SCP-x7x.mp3';
-                //     else if (level >= 4 && level <= 5) src = 'audio/bgm_Despair_and_Triumph.mp3';
-                //     else if (level >= 6 && level <= 12) src = 'audio/bgm_SCP-x5x.mp3';
-                //     else if (level >= 13 && level <= 15) src = 'audio/bgm_SCP-x6x.mp3';
-                //     else src = 'audio/bgm_Ossuary_6_Air.mp3';
-
-                //     // 🔹 유저 허용 없으면 재생 예약만
-                //     if (!MazeGame.state.audioReady) {
-                //         console.warn('🎧 아직 오디오 허용 안 됨 — 다음 클릭 시 재시도 예정');
-                //         const tryPlay = () => {
-                //             MazeGame.state.audioReady = true;
-                //             MazeGame.audio.playBGM(level);
-                //             document.removeEventListener('click', tryPlay);
-                //             document.removeEventListener('touchstart', tryPlay);
-                //         };
-                //         document.addEventListener('click', tryPlay);
-                //         document.addEventListener('touchstart', tryPlay);
-                //         return;
-                //     }
-
-                //     bgm.pause();
-                //     bgm.src = src;
-                //     bgm.volume = 0.4;
-                //     bgm.load();
-                //     bgm.play().catch(e => console.warn('BGM 재생 실패:', e));
-                // },
-                // playBGM(level) {
-                //     const bgm = document.getElementById('bgm');
-                //     if (!bgm) return;
-
-                //     let src = '';
-                //     if (level >= 1 && level <= 3) src = 'audio/bgm_SCP-x7x.mp3';
-                //     else if (level >= 4 && level <= 5) src = 'audio/bgm_Despair_and_Triumph.mp3';
-                //     else if (level >= 6 && level <= 12) src = 'audio/bgm_SCP-x5x.mp3';
-                //     else if (level >= 13 && level <= 15) src = 'audio/bgm_SCP-x6x.mp3';
-                //     else src = 'audio/bgm_Ossuary_6_Air.mp3';
-
-                //     // 1. 이미 BGM 파일 로딩 중이거나 재생 중이면 중단
-                //     bgm.pause();
-                //     bgm.src = src;
-                //     bgm.volume = 0.4;
-
-                //     // 2. 권한이 없으면, 권한을 획득하는 함수를 실행하고 끝냅니다.
-                //     if (!MazeGame.state.audioReady) {
-                //         console.warn('🎧 오디오 권한 획득이 필요합니다.');
-                //         // 이 권한 획득 로직은 startBtn의 onClick 이벤트로 옮기는 것이 가장 좋습니다.
-
-                //         // playBGM 내부에서 처리해야 한다면:
-                //         const tryPlay = () => {
-                //             MazeGame.state.audioReady = true;
-                //             // 권한 획득 후 BGM을 다시 로드/재생 시도 (자기 자신을 재호출)
-                //             MazeGame.audio.playBGM(level);
-                //             document.removeEventListener('click', tryPlay);
-                //             document.removeEventListener('touchstart', tryPlay);
-                //         };
-                //         document.addEventListener('click', tryPlay);
-                //         document.addEventListener('touchstart', tryPlay);
-                //         return; // 👈 권한이 없으면 로드/재생을 시도하지 않고 종료
-                //     }
-
-                //     // 3. 권한이 있다면: 로딩 완료를 보장한 후 재생을 시도
-                //     // 기존 리스너 제거 (중복 이벤트 방지)
-                //     const clone = bgm.cloneNode(true);
-                //     bgm.parentNode.replaceChild(clone, bgm);
-                //     const newBgm = clone;
-
-                //     // 로딩 완료를 기다리는 리스너 설정
-                //     newBgm.addEventListener('canplaythrough', function attemptPlay() {
-                //         newBgm.play()
-                //             .then(() => {
-                //                 // 성공적으로 재생 시작
-                //                 localStorage.setItem('audioUnlocked', 'true');
-                //             })
-                //             .catch(e => {
-                //                 // 권한을 얻었지만 재생 실패 (다른 이유), 다음 클릭을 유도
-                //                 console.error('BGM 재생 실패 (로딩 완료 후):', e);
-                //                 localStorage.setItem('audioUnlocked', 'false');
-                //             });
-                //     }, { once: true });
-
-                //     // 로드 시작
-                //     newBgm.load();
-                // },
-
                 playBGM(level) {
                     const bgm = document.getElementById('bgm');
                     if (!bgm) return;
@@ -658,65 +447,12 @@ http://creativecommons.org/licenses/by/4.0/
                         return; // 뮤트면 바로 함수 종료
                     }
 
-                    // 재생 중이 아니거나 오디오 요소가 준비된 경우에만 재생 시도
-                    // if (bgm && bgm.paused) {
-                    //     bgm.volume = 0.4;
 
-                    //     // Promise를 반환하는 play() 호출
-                    //     bgm.play().then(() => {
-                    //         MazeGame.state.audioReady = true;
-                    //         console.log('🎵 오디오: BGM 재생 성공');
-                    //     }).catch(e => {
-                    //         console.warn('🎧 오디오: BGM 재생 실패 (권한 문제 등)', e);
-                    //         // 재생 실패 시에도 isMuted를 체크할 필요는 없습니다.
-                    //     });
-                    // }
-
-                    // // 1. 기존 오디오 엘리먼트를 복제하고 교체하여 모든 기존 이벤트와 상태를 초기화
-                    // const newBgm = bgm.cloneNode(true);
-                    // bgm.parentNode.replaceChild(newBgm, bgm);
-
-                    // // 2. 권한이 있다면: 로딩 완료를 보장한 후 재생을 시도
-                    // if (MazeGame.state.audioReady) {
-                    //     newBgm.src = src;
-                    //     newBgm.volume = 0.4;
-
-                    //     newBgm.addEventListener('canplaythrough', function attemptPlay() {
-                    //         newBgm.play()
-                    //             .then(() => {
-                    //                 localStorage.setItem('audioUnlocked', 'true');
-                    //             })
-                    //             .catch(e => {
-                    //                 console.error('BGM 재생 실패 (로딩 완료 후):', e);
-                    //                 localStorage.setItem('audioUnlocked', 'false');
-                    //             });
-                    //     }, { once: true });
-
-                    //     newBgm.load(); // 로드 시작
-                    // } else {
-                    //     // 3. 권한이 없다면: 클릭 이벤트 리스너만 설정하고 종료
-                    //     // 이 부분은 startLevel이 아닌 startBtn.onclick에서 처리하는 것이 더 좋지만, 
-                    //     // 현재 로직을 유지한다면 다음과 같이 정리합니다.
-
-                    //     console.warn('🎧 아직 오디오 허용 안 됨 — 다음 클릭 시 재시도 예정');
-                    //     const tryPlay = () => {
-                    //         MazeGame.state.audioReady = true;
-                    //         MazeGame.audio.playBGM(level);
-                    //         document.removeEventListener('click', tryPlay);
-                    //         document.removeEventListener('touchstart', tryPlay);
-                    //     };
-                    //     document.addEventListener('click', tryPlay);
-                    //     document.addEventListener('touchstart', tryPlay);
-                    //     return;
-                    // }
                     // 1. 확실하게 이전 재생 정지
                     bgm.pause();
                     bgm.currentTime = 0; // 재생 위치 초기화
 
                     // 2. 이전에 등록되었을 수 있는 'canplaythrough' 이벤트 리스너를 제거합니다.
-                    // (⚠️ 주의: 익명 함수로 등록했다면 제거가 어렵습니다. Named Function으로 변경해야 합니다.)
-                    // 가장 확실한 방법은, 로딩을 담당할 함수를 외부(혹은 내부)에 명시적으로 정의하는 것입니다.
-
                     function handleCanPlayThrough() {
                         // 이벤트가 발생한 후 즉시 자신을 제거
                         bgm.removeEventListener('canplaythrough', handleCanPlayThrough);
@@ -760,40 +496,10 @@ http://creativecommons.org/licenses/by/4.0/
                         return;
                     }
                 },
-                // 📍 index.html: MazeGame.audio 객체 내부
-                // playBGM(level) {
-                //     const bgm = document.getElementById('bgm');
-                //     if (!bgm) return;
-
-                //     // ... (레벨에 따른 src 경로 설정 로직 유지) ...
-
-                //     // BGM 교체 및 로드
-                //     // ... (bgm.pause(), bgm.src = src, bgm.volume = 0.4, bgm.load() 유지) ...
-
-                //     // 재생 시도 (권한 없으면 실패)
-                //     bgm.play()
-                //         .then(() => {
-                //             localStorage.setItem('audioUnlocked', 'true');
-                //         })
-                //         .catch(e => {
-                //             // 🚨 실패 시, 다음 클릭을 유도하도록 localStorage 상태를 변경
-                //             localStorage.setItem('audioUnlocked', 'false');
-                //         });
-                // },
-
-
                 stopBGM() {
                     const bgm = document.getElementById('bgm');
                     if (bgm) bgm.pause();
                 },
-
-                // toggle() {
-                //     const bgm = document.getElementById('bgm');
-                //     const btn = document.getElementById('bgmToggle');
-                //     this.muted = !this.muted;
-                //     if (bgm) bgm.volume = this.muted ? 0 : 0.4;
-                //     if (btn) btn.textContent = this.muted ? '🔇' : '🔊';
-                // },
                 toggle() {
                     const bgm = document.getElementById('bgm');
                     const btn = document.getElementById('bgmToggle');
@@ -816,7 +522,6 @@ http://creativecommons.org/licenses/by/4.0/
                     }
                 },
             },
-            // ... (기존 storage, input 등)
 
             /**
              * 6. 도감 (Codex) 관리
@@ -865,20 +570,6 @@ http://creativecommons.org/licenses/by/4.0/
                     noteContainer.innerHTML = storyContentHtml;
                     overlayPanel.appendChild(noteContainer);
 
-                    // // ✅ 전체 스토리 버튼
-                    // if (gotAll && fullStoryText) {
-                    //     const fullStoryBtn = document.createElement('button');
-                    //     fullStoryBtn.className = 'primary';
-                    //     fullStoryBtn.textContent = '📖 전체 스토리 보기';
-                    //     Object.assign(fullStoryBtn.style, { marginTop: '15px', marginBottom: '8px', width: '100%' });
-                    //     fullStoryBtn.onclick = () => {
-                    //         overlay.style.display = 'none';
-                    //         MazeGame.ui.showStoryOverlay(`[${group.label}] - 전체 스토리`, fullStoryText, 0, group);
-
-                    //         // MazeGame.ui.showStoryOverlay(`[${group.label}] - 전체 스토리`, fullStoryText, 0);
-                    //     };
-                    //     overlayPanel.appendChild(fullStoryBtn);
-                    // }
                     // ✅ 전체 스토리 버튼
                     if (gotAll && fullStoryText) {
                         const fullStoryBtn = document.createElement('button');
@@ -905,12 +596,7 @@ http://creativecommons.org/licenses/by/4.0/
                             overlay.style.display = 'none';
                             // showStoryOverlay 호출 시, 현재 그룹을 backContextGroup으로 전달
                             MazeGame.ui.showStoryOverlay(`[${group.label}] - 전체 스토리`, fullStoryText, 0, group);
-                            // ------------------------------
 
-                            // ⚠️ 중요: showStoryOverlay가 닫힐 때 이 리스너를 다시 등록해야 합니다.
-                            // 이는 MazeGame.ui.showStoryOverlay 내부의 backBtn 또는 closeBtn 로직에서 처리되어야 합니다.
-
-                            // 닫히기 전까지는 버튼이 비활성화되도록 리스너를 제거한 상태로 둡니다.
                         };
 
                         // 2. 이벤트 리스너 등록
@@ -939,17 +625,11 @@ http://creativecommons.org/licenses/by/4.0/
                     const backBtn = document.createElement('button');
                     backBtn.className = 'secondary';
                     backBtn.textContent = '이전으로';
-                    // backBtn.onclick = () => {
-                    //     overlay.style.display = 'none';
-                    //     MazeGame.codex.open(); // 🔥 도감 목록으로 복귀
-                    // };
 
                     const closeBtn = document.createElement('button');
                     closeBtn.className = 'ghost';
                     closeBtn.textContent = '닫기';
-                    // closeBtn.onclick = () => {
-                    //     overlay.style.display = 'none';
-                    // };
+
                     // ... (backBtn 생성 코드) ...
                     const handleBackToCodex = (event) => {
                         // 중복 방지 로직...
@@ -1009,18 +689,7 @@ http://creativecommons.org/licenses/by/4.0/
                         }
                         row.appendChild(preview);
 
-                        // row.onclick = () => {
-                        //     if (g.parts.filter(pid => !!MazeGame.state.collectedStories[pid]).length === 0) {
-                        //         MazeGame.ui.showToast('획득한 쪽지가 없습니다.');
-                        //         return;
-                        //     }
-                        //     MazeGame.codex.showGroupOverlay(g);
-                        //     codexOverlay.style.display = 'none';
-                        // };
                         const handleGroupClick = (g) => (event) => {
-                            // ⚠️ 중복 실행 방지
-                            // event.currentTarget.removeEventListener('click', handleGroupClick(g));
-                            // event.currentTarget.removeEventListener('touchstart', handleGroupClick(g));
                             if (event.type === 'touchstart') {
                                 event.preventDefault(); // 스크롤이 아닌 클릭으로 인식
                             }
@@ -1034,7 +703,7 @@ http://creativecommons.org/licenses/by/4.0/
                         };
 
                         const handler = handleGroupClick(g);
-                        // ✅ 새로운 이벤트 리스너 등록
+                        // 새로운 이벤트 리스너 등록
                         row.addEventListener('touchstart', handleGroupClick(g), { passive: false });
                         row.addEventListener('click', handleGroupClick(g));
                         codexPanel.appendChild(row);
@@ -1046,10 +715,7 @@ http://creativecommons.org/licenses/by/4.0/
                     close.innerHTML = `<div style="text-align:right"><button class="primary" id="codexClose">닫기</button></div>`;
                     codexPanel.appendChild(close);
                     codexOverlay.style.display = 'flex';
-                    // document.getElementById('codexClose').onclick = () => { codexOverlay.style.display = 'none'; };
                     const codexCloseBtn = document.getElementById('codexClose');
-
-                    // ❌ 기존 코드 제거: document.getElementById('codexClose').onclick = () => { codexOverlay.style.display = 'none'; };
 
                     // 닫기 로직 함수 정의
                     const handleCodexClose = (event) => {
@@ -1057,13 +723,6 @@ http://creativecommons.org/licenses/by/4.0/
                             event.preventDefault();
                         }
                         codexOverlay.style.display = 'none';
-
-                        // ⚠️ 중요: codexBtn 리스너 재등록
-                        // 도감(codex)을 열었던 버튼(codexBtn)에 once:true 옵션이 있었다면,
-                        // 여기서 MazeGame.dom.codexBtn에 리스너를 다시 등록해야 합니다.
-                        // 만약 리스너 재등록이 필요하다면 이 코드를 추가해야 합니다:
-                        // MazeGame.dom.codexBtn.addEventListener('click', () => MazeGame.codex.open(), { once: true });
-                        // MazeGame.dom.codexBtn.addEventListener('touchstart', () => MazeGame.codex.open(), { once: true, passive: false });
                     };
 
                     // ✅ 새로운 이벤트 리스너 등록
@@ -1131,7 +790,7 @@ http://creativecommons.org/licenses/by/4.0/
                 },
 
                 ensureSpawnOrder() {
-                    // ✅ 이제 sessionStorage 대신 localStorage 사용 (세션 유지)
+                    // 이제 sessionStorage 대신 localStorage 사용 (세션 유지)
                     try {
                         const raw = localStorage.getItem(MazeGame.config.SPAWN_KEY);
                         if (raw) {
@@ -1147,7 +806,7 @@ http://creativecommons.org/licenses/by/4.0/
                     } catch (e) { }
                     return built;
                 },
-                // ✅ 레벨별 쪽지 매핑용 인덱스 관리 (새 함수 추가)
+                // 레벨별 쪽지 매핑용 인덱스 관리 (새 함수 추가)
                 getSpawnIndex() {
                     return parseInt(localStorage.getItem(MazeGame.config.SPAWN_INDEX_KEY) || '0', 10);
                 },
@@ -1757,43 +1416,7 @@ http://creativecommons.org/licenses/by/4.0/
                         <div class="actions">
                             <button class="primary" id="startBtn">${buttonText}</button>
                         </div>`;
-                    // overlay.style.display = 'flex';
-                    // // overlay.style.display = 'flex';
-                    // setTimeout(() => bindStartButton(), 50);
 
-                    // // 3. 버튼 클릭 핸들러 (유일한 BGM 권한 획득 지점)
-                    // document.getElementById('startBtn').onclick = () => {
-                    //     const bgm = document.getElementById('bgm');
-                    //     let permissionPromise = Promise.resolve();
-
-                    //     if (bgm && bgm.paused) {
-                    //         bgm.volume = 0;
-                    //         permissionPromise = bgm.play();
-                    //     }
-
-                    //     permissionPromise.then(() => {
-                    //         // 권한 획득 성공 후, 즉시 정지시킵니다.
-                    //         // play() 요청이 완료된 후 pause()를 호출하므로 AbortError 발생 위험이 낮아집니다.
-                    //         // if (bgm) {
-                    //         //     bgm.pause(); // 👈 BGM 정지 추가
-                    //         //     bgm.currentTime = 0; // 시작 지점으로 돌려 놓기
-                    //         //     bgm.volume = 0.4; // 실제 재생할 볼륨으로 미리 설정 (선택 사항)
-                    //         // }
-                    //         // console.log('🎵 오디오 권한 획득 완료 (클릭)');
-                    //         // localStorage.setItem('audioUnlocked', 'true');
-                    //         MazeGame.state.audioReady = true; // 여기서 true로 변경
-
-                    //     }).catch(err => {
-                    //         // ... (생략) ...
-                    //     }).finally(() => {
-                    //         // 1. ⚠️ 핵심: 게임 상태 플래그를 다시 true로 설정
-                    //         // MazeGame.state.isRunning = true;
-                    //         // ... (생략) ...
-                    //         MazeGame.engine.startLevel(startLevel).then(() => {
-                    //             requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
-                    //         });
-                    //     });
-                    // };
                     overlay.style.display = 'flex';
 
                     // DOM 렌더 완료 후 바인딩
@@ -1825,8 +1448,6 @@ http://creativecommons.org/licenses/by/4.0/
                                 // 3. 게임 루프 시작
                                 MazeGame.state.animationFrame = requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
                             });
-                            // MazeGame.engine.startLevel(MazeGame.state.level);
-                            // requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
                         };
 
                         // 모바일/PC 모두 커버
@@ -1834,40 +1455,7 @@ http://creativecommons.org/licenses/by/4.0/
                         startBtn.addEventListener('touchstart', startHandler, { passive: false });
                     }, 100);
 
-                    // const startBtn = document.getElementById('startBtn');
-                    // if (!startBtn) return;
-
-                    // // 하나의 핸들러로 통합
-                    // const startHandler = () => {
-                    //     const bgm = document.getElementById('bgm');
-                    //     let permissionPromise = Promise.resolve();
-
-                    //     if (bgm && bgm.paused) {
-                    //         bgm.volume = 0;
-                    //         permissionPromise = bgm.play();
-                    //     }
-
-                    //     permissionPromise
-                    //         .then(() => {
-                    //             // ✅ 권한 획득
-                    //             MazeGame.state.audioReady = true;
-                    //             localStorage.setItem('audioUnlocked', 'true');
-                    //             console.log('🎵 오디오 권한 획득 (터치/클릭)');
-                    //         })
-                    //         .catch(err => {
-                    //             console.warn('🎧 오디오 권한 획득 실패:', err);
-                    //         })
-                    //         .finally(() => {
-                    //             MazeGame.engine.startLevel(startLevel).then(() => {
-                    //                 requestAnimationFrame(MazeGame.engine.update.bind(MazeGame.engine));
-                    //             });
-                    //         });
-                    // };
-
-                    // // ✅ 데스크톱 + 모바일 이벤트 모두 등록
-                    // startBtn.addEventListener('click', startHandler, { once: true });
-                    // // startBtn.addEventListener('touchstart', startHandler, { once: true, passive: true });
-                }, // ⚠️ 다음 속성(init)과 구분하는 쉼표(,)를 반드시 확인하세요!
+                },
             },
 
             /**
@@ -1875,7 +1463,7 @@ http://creativecommons.org/licenses/by/4.0/
              * - 게임 시작에 필요한 모든 요소를 설정하고 실행합니다.
              */
             init() {
-                // ✅ 초기화 시 약간의 지연을 주어 모바일 초기 로딩 안정화
+                // 초기화 시 약간의 지연을 주어 모바일 초기 로딩 안정화
                 setTimeout(() => {
 
                     // DOM 요소 캐싱
@@ -1914,98 +1502,35 @@ http://creativecommons.org/licenses/by/4.0/
                         this.storage.resetSpawnSession();
                         this.ui.showToast('세션 스폰 순서 초기화 완료.');
                     });
-                    // this.dom.codexBtn.addEventListener('click', () => this.codex.open());
+
                     // 이벤트 핸들러 함수 정의
                     let isHandled = false; // 플래그 변수 추가
                     const handleCodexOpen = (event) => {
-                        // ⚠️ 중복 실행 방지: touchstart와 click이 모두 발동하는 것을 막기 위해 리스너 제거
-                        // event.currentTarget.removeEventListener('click', handleCodexOpen);
-                        // event.currentTarget.removeEventListener('touchstart', handleCodexOpen);
-
                         // 도감 열기
                         this.codex.open();
-
-                        // 도감을 닫은 후 다시 클릭이 가능하도록 리스너를 다시 등록해야 합니다.
-                        // 도감이 닫힐 때(codex.close() 호출 후) 리스너를 다시 등록하는 로직이 필요합니다.
-                        // 하지만 현재는 codex.open()만 있으므로, 여기서는 단순히 함수를 호출합니다.
-
-                        // 💡 참고: codex.open()은 게임 상태를 건드리지 않으므로, 
-                        // 리스너를 제거하지 않고 그냥 두는 것도 하나의 방법입니다.
-                        // 만약 리스너를 제거하지 않는다면, 코드는 아래와 같이 더 간단해집니다.
-
                     };
-
-
-                    // 2. 이벤트 리스너 등록 (리스너를 제거하지 않는 간결한 방식)
-                    // 이 버튼은 게임 상태를 변경하지 않으므로, 이 방식이 가장 간단하고 효과적입니다.
 
                     this.dom.codexBtn.addEventListener('touchstart', handleCodexOpen, { passive: true });
                     this.dom.codexBtn.addEventListener('click', handleCodexOpen);
 
-                    // (만약 codex.open()이 복잡한 비동기 작업이라면, 1번 방식처럼 함수를 정의하고
-                    // 중복 실행을 막는 것이 안전합니다.)
-
-
-                    // this.dom.homeBtn.addEventListener('click', () => this.engine.showIntroStart());
                     // 이벤트 핸들러 함수 정의
                     const handleHomeButtonClick = (event) => {
-                        // ⚠️ 중복 실행 방지: touchstart와 click이 모두 발동하는 것을 막기 위해 리스너 제거
-                        // event.currentTarget.removeEventListener('click', handleHomeButtonClick);
-                        // event.currentTarget.removeEventListener('touchstart', handleHomeButtonClick);
-
-                        // // --- 기존의 홈 버튼 로직 ---
-
-                        // // 1. 게임 상태 저장
-                        // MazeGame.storage.saveLevel();
-
-                        // // 2. 게임 루프 정지
-                        // if (MazeGame.state.isRunning && MazeGame.state.animationFrame) {
-                        //     cancelAnimationFrame(MazeGame.state.animationFrame);
-                        // }
-                        // MazeGame.state.isRunning = false;
-
-                        // // 3. BGM 정지
+                        // BGM 정지
                         const bgm = document.getElementById('bgm');
                         if (bgm) bgm.pause();
 
-                        // 4. 홈 화면 표시
+                        // 홈 화면 표시
                         MazeGame.engine.showIntroStart();
-
-                        // ----------------------------
-
-                        // ⚠️ showIntroStart() 호출 후, 리스너가 필요하다면 다시 등록해야 합니다.
-                        // 하지만 homeBtn은 오버레이가 사라진 후에도 계속 HUD에 남아있으므로
-                        // 리스너를 제거하지 않고, 함수 내에서 상태 변화만 처리하는 것이 더 간단할 수 있습니다.
-                        // 여기서는 안전하게 리스너를 제거하는 방식을 유지하고, 필요에 따라 다시 등록하는 로직을
-                        // showIntroStart() 내부에 추가하는 것이 좋습니다.
                     };
 
-                    // 2. 이벤트 리스너 등록
-                    // this.dom.homeBtn.addEventListener('click', () => this.engine.showIntroStart()); // ❌ 기존 코드 제거
 
                     this.dom.homeBtn.addEventListener('touchstart', handleHomeButtonClick, { passive: true });
                     this.dom.homeBtn.addEventListener('click', handleHomeButtonClick);
 
-                    // this.dom.freshStartBtn.addEventListener('click', () => {
-                    //     if (!confirm('정말 처음부터 시작하시겠습니까? (도감/획득한 쪽지 모두 초기화됩니다)')) return;
-                    //     this.storage.resetCollectedStories();
-                    //     this.storage.resetSpawnSession();
-                    //     this.storage.resetLevelProgress(); // ✅ 레벨 초기화 추가
-                    //     this.ui.updateHud();
-                    //     this.ui.showToast('도감이 초기화되었습니다.');
-                    //     this.engine.showIntroStart();
-                    // });
                     // 이벤트 핸들러 함수 정의
                     const handleFreshStart = (event) => {
-                        // ⚠️ 중복 실행 방지: touchstart와 click이 모두 발동하는 것을 막기 위해 리스너 제거
-                        // 'this'가 리스너 등록 시점의 객체(MazeGame.engine 등)를 가리키도록 주의해야 합니다.
-                        // event.currentTarget.removeEventListener('click', handleFreshStart);
-                        // event.currentTarget.removeEventListener('touchstart', handleFreshStart);
-
                         // --- 기존의 '처음부터 시작' 로직 ---
                         if (!confirm('정말 처음부터 시작하시겠습니까? (도감/획득한 쪽지 모두 초기화됩니다)')) {
-                            // 취소 시, 제거했던 리스너를 다시 등록합니다. (필요하다면)
-                            // 복잡하므로, confirm을 먼저 묻는 것이 좋습니다.
                             event.currentTarget.addEventListener('click', handleFreshStart);
                             event.currentTarget.addEventListener('touchstart', handleFreshStart, { passive: true });
                             return;
@@ -2016,8 +1541,6 @@ http://creativecommons.org/licenses/by/4.0/
                         MazeGame.storage.resetLevelProgress(); // ✅ 레벨 초기화
                         MazeGame.ui.updateHud();
                         MazeGame.ui.showToast('도감이 초기화되었습니다.');
-
-                        // BGM을 멈추고 게임 루프를 정지하는 로직을 추가해야 할 수도 있습니다.
 
                         MazeGame.engine.showIntroStart();
                         // ------------------------------------
@@ -2073,32 +1596,16 @@ http://creativecommons.org/licenses/by/4.0/
 
                     // 📍 index.html: MazeGame.init() 함수 내부
 
-                    // ... (this.state.lastTime = performance.now(); 다음)
 
-                    // ✅ 오디오 허용 상태 확인
+                    // 오디오 허용 상태 확인
                     const hasAudioUnlock = localStorage.getItem('audioUnlocked') === 'true';
                     const hasCollectedIntro = !!this.state.collectedStories['intro'];
 
-                    // // ✅ 게임 시작 분기 처리 (가장 핵심)
-                    // if (hasCollectedIntro && hasAudioUnlock) {
-                    //     // 🟢 Case 1: 자동 시작 (권한 있음)
-                    //     this.engine.startLevel(this.state.level).then(() => {
-                    //         requestAnimationFrame(this.engine.update.bind(this.engine));
-                    //     });
-                    // } else {
-                    //     // 🔴 Case 2 & 3: 처음이거나, 오디오 권한이 없으면 무조건 클릭 유도 화면 표시
-                    //     this.engine.showIntroStart();
-                    // }
-
-                    // ✅ 게임 시작 분기 처리 (가장 핵심)
-                    // 🔴 무조건 인트로 오버레이를 띄워 사용자에게 시작/이어하기를 선택하도록 유도합니다.
+                    // 게임 시작 분기 처리 (가장 핵심)
+                    // 무조건 인트로 오버레이를 띄워 사용자에게 시작/이어하기를 선택하도록 유도
                     this.engine.showIntroStart();
 
-                    // document.getElementById('bgmToggle').addEventListener('click', () => {
-                    //     MazeGame.audio.toggle();
-                    // });
                     // BGM 토글 버튼 이벤트 등록 부분
-
                     const bgmToggleBtn = document.getElementById('bgmToggle');
                     let isProcessing = false; // 💡 새로운 플래그를 클로저에 등록
 
@@ -2119,15 +1626,12 @@ http://creativecommons.org/licenses/by/4.0/
                         setTimeout(() => { isProcessing = false; }, 50);
                     };
 
-                    // ❌ 기존 코드 제거: document.getElementById('bgmToggle').addEventListener('click', () => { ... });
-
-                    // ✅ 새로운 이벤트 리스너 등록
                     bgmToggleBtn.addEventListener('touchstart', handleBgmToggle, { passive: false }); // passive: false 필수
                     bgmToggleBtn.addEventListener('click', handleBgmToggle);
 
                     const creditsBtn = document.getElementById('creditsBtn');
                     if (creditsBtn) {
-                        let isProcessing = false; // ✅ 플래그가 이 블록 내부에서 한 번만 정의되는지 확인
+                        let isProcessing = false; // 플래그가 이 블록 내부에서 한 번만 정의되는지 확인
 
                         const handleCreditsOpen = (event) => {
                             if (isProcessing) return;
@@ -2137,7 +1641,7 @@ http://creativecommons.org/licenses/by/4.0/
                                 event.preventDefault();
                             }
 
-                            // 🚨 이 함수가 실행되는지 디버깅으로 확인해 보세요.
+                            // 이 함수가 실행되는지 디버깅으로 확인해 보세요.
                             console.log("크레딧 버튼 클릭됨");
                             MazeGame.ui.showCreditsOverlay();
 
@@ -2147,19 +1651,12 @@ http://creativecommons.org/licenses/by/4.0/
                         creditsBtn.addEventListener('touchstart', handleCreditsOpen, { passive: false });
                         creditsBtn.addEventListener('click', handleCreditsOpen);
                     }
-
-
                     // 디버그용 전역 접근
                     window._GAME = {
                         getState: () => this.state,
                         resetStories: () => { this.storage.resetCollectedStories(); alert('stories reset'); },
                         resetSpawnSession: () => { this.storage.resetSpawnSession(); alert('spawn session reset'); }
                     };
-
-
-
-
-
                 }, 200); // ✅ 약간의 지연으로 모바일 localStorage 준비 시간 확보
             }
         }
@@ -2167,11 +1664,6 @@ http://creativecommons.org/licenses/by/4.0/
         // DOM이 로드된 후 게임을 초기화합니다.
         window.addEventListener('DOMContentLoaded', () => {
             MazeGame.init();
-            // document.addEventListener('touchstart', () => {
-            //     const bgm = document.getElementById('bgm');
-            //     bgm.volume = 0.4;
-            //     bgm.play();
-            // }, { once: true });
         });
 
     </script>
