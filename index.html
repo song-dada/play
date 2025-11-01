@@ -150,6 +150,7 @@
                 roadImages: { "road": new Image() },
                 isRunning: true,
                 audioReady: false,
+                isMuted: false,
 
                 // player
                 playerImages: { up: new Image(), down: new Image(), left: new Image(), right: new Image() },
@@ -650,6 +651,27 @@ http://creativecommons.org/licenses/by/4.0/
                     else if (level >= 13 && level <= 15) src = 'audio/bgm_SCP-x6x.mp3';
                     else src = 'audio/bgm_Ossuary_6_Air.mp3';
 
+
+                    // 🚨 핵심 수정: 뮤트 상태일 경우 재생 시도 자체를 하지 않음
+                    if (MazeGame.state.isMuted) {
+                        console.log("🔊 오디오: 뮤트 상태이므로 BGM 재생을 건너뜁니다.");
+                        return; // 뮤트면 바로 함수 종료
+                    }
+
+                    // 재생 중이 아니거나 오디오 요소가 준비된 경우에만 재생 시도
+                    // if (bgm && bgm.paused) {
+                    //     bgm.volume = 0.4;
+
+                    //     // Promise를 반환하는 play() 호출
+                    //     bgm.play().then(() => {
+                    //         MazeGame.state.audioReady = true;
+                    //         console.log('🎵 오디오: BGM 재생 성공');
+                    //     }).catch(e => {
+                    //         console.warn('🎧 오디오: BGM 재생 실패 (권한 문제 등)', e);
+                    //         // 재생 실패 시에도 isMuted를 체크할 필요는 없습니다.
+                    //     });
+                    // }
+
                     // // 1. 기존 오디오 엘리먼트를 복제하고 교체하여 모든 기존 이벤트와 상태를 초기화
                     // const newBgm = bgm.cloneNode(true);
                     // bgm.parentNode.replaceChild(newBgm, bgm);
@@ -765,12 +787,33 @@ http://creativecommons.org/licenses/by/4.0/
                     if (bgm) bgm.pause();
                 },
 
+                // toggle() {
+                //     const bgm = document.getElementById('bgm');
+                //     const btn = document.getElementById('bgmToggle');
+                //     this.muted = !this.muted;
+                //     if (bgm) bgm.volume = this.muted ? 0 : 0.4;
+                //     if (btn) btn.textContent = this.muted ? '🔇' : '🔊';
+                // },
                 toggle() {
                     const bgm = document.getElementById('bgm');
                     const btn = document.getElementById('bgmToggle');
-                    this.muted = !this.muted;
-                    if (bgm) bgm.volume = this.muted ? 0 : 0.4;
-                    if (btn) btn.textContent = this.muted ? '🔇' : '🔊';
+                    const newState = !MazeGame.state.isMuted; // 새 상태 결정
+                    MazeGame.state.isMuted = newState;
+
+                    if (newState) btn.textContent = this.muted ? '🔇' : '🔊';
+
+                    if (newState === true) { // 🚨 뮤트 상태가 될 때
+                        if (bgm) {
+                            bgm.pause(); // BGM 일시정지
+                            console.log("🔊 오디오: 뮤트 (일시정지)");
+                            btn.textContent = '🔇';
+                        }
+                    } else { // 🚨 뮤트 해제 상태가 될 때
+                        // 뮤트가 해제되면 BGM 재생을 시도합니다.
+                        MazeGame.audio.playBGM();
+                        console.log("🔊 오디오: 뮤트 해제 (재생 시도)");
+                        btn.textContent = '🔊';
+                    }
                 },
             },
             // ... (기존 storage, input 등)
@@ -1956,8 +1999,8 @@ http://creativecommons.org/licenses/by/4.0/
                     const handleFreshStart = (event) => {
                         // ⚠️ 중복 실행 방지: touchstart와 click이 모두 발동하는 것을 막기 위해 리스너 제거
                         // 'this'가 리스너 등록 시점의 객체(MazeGame.engine 등)를 가리키도록 주의해야 합니다.
-                        event.currentTarget.removeEventListener('click', handleFreshStart);
-                        event.currentTarget.removeEventListener('touchstart', handleFreshStart);
+                        // event.currentTarget.removeEventListener('click', handleFreshStart);
+                        // event.currentTarget.removeEventListener('touchstart', handleFreshStart);
 
                         // --- 기존의 '처음부터 시작' 로직 ---
                         if (!confirm('정말 처음부터 시작하시겠습니까? (도감/획득한 쪽지 모두 초기화됩니다)')) {
@@ -1985,6 +2028,7 @@ http://creativecommons.org/licenses/by/4.0/
 
                     this.dom.freshStartBtn.addEventListener('touchstart', handleFreshStart, { passive: true });
                     this.dom.freshStartBtn.addEventListener('click', handleFreshStart);
+
                     // ✅ 키보드 입력 추가
                     document.addEventListener('keydown', e => {
                         const p = MazeGame.state.player;
