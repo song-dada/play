@@ -154,7 +154,8 @@ canvas#miniMap {
     align-items: center;
     justify-content: center;
     background: rgba(0, 0, 0, 0.7);
-    z-index: 200
+    z-index: 200;
+    pointer-events: auto;
 }
 
 .overlay .panel {
@@ -164,7 +165,8 @@ canvas#miniMap {
     min-width: 260px;
     max-width: 90%;
     color: #fff;
-    border: 1px solid #222
+    border: 1px solid #222;
+    pointer-events: auto;
 }
 
 .overlay .panel img {
